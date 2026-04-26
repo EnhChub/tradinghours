@@ -190,14 +190,9 @@
     });
   }
 
-  // ── Earnings data ──
-  // NY release time → Sydney landing time
-  const earningsData = [
-    {
-      ny: { y: 2026, m: 3, d: 27, h: 17, mn: 0 }, type: 'AMC',
-      major: false,
-      cos: ['Welltower', 'Whirlpool', 'Cadence', 'Brown & Brown']
-    },
+  // ── Earnings: fetched from earnings.json (auto-updated daily) ──
+  // Fallback data used if fetch fails (e.g. first load, network issue, or earnings.json missing)
+  const FALLBACK_EARNINGS = [
     {
       ny: { y: 2026, m: 3, d: 28, h: 7, mn: 0 }, type: 'BMO',
       major: true,
@@ -215,7 +210,7 @@
       ny: { y: 2026, m: 3, d: 30, h: 17, mn: 0 }, type: 'AMC',
       major: true,
       cos: ['Apple', 'Eli Lilly'],
-      extra: 'Mastercard, Caterpillar, Merck, Amgen, SanDisk',
+      extra: 'Mastercard, Caterpillar, Merck, Amgen',
       event: '美国 Q1 GDP 初值 · 欧央行利率决议'
     },
     {
@@ -226,6 +221,28 @@
       event: 'ISM 制造业 PMI'
     }
   ];
+
+  let earningsData = FALLBACK_EARNINGS;
+  let earningsUpdated = null;
+  const earningsListeners = [];
+
+  // Try to load fresh data from earnings.json (generated daily by GitHub Actions)
+  function loadEarnings() {
+    fetch('earnings.json?t=' + Date.now(), { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : Promise.reject('not found'))
+      .then(data => {
+        if (data && Array.isArray(data.items) && data.items.length > 0) {
+          earningsData = data.items;
+          earningsUpdated = data.updated || null;
+          earningsListeners.forEach(fn => { try { fn(); } catch(e){} });
+        }
+      })
+      .catch(err => {
+        // Stay on fallback - this is fine
+        console.log('Using fallback earnings data:', err);
+      });
+  }
+  loadEarnings();
 
   function fmtSydneyForAgenda(date) {
     const p = partsInTz(SYD, date);
@@ -287,6 +304,11 @@
     });
   }
 
+  // Re-render any agenda containers when fresh data arrives
+  function onEarningsUpdate(fn) {
+    earningsListeners.push(fn);
+  }
+
   function fmtCountdown(ms) {
     if (ms < 0) return '现在';
     const totalSec = Math.floor(ms / 1000);
@@ -302,6 +324,8 @@
     SYD, NY, DAY_NAMES, DAY_LONG_EN, DAY_CN,
     pad, partsInTz, fmtClockHMS, fmtClock24,
     asxStatusText, usStatusText, findNextEvent,
-    renderTimeline, renderAgenda, fmtCountdown
+    renderTimeline, renderAgenda, fmtCountdown,
+    onEarningsUpdate,
+    getEarningsUpdatedAt: () => earningsUpdated
   };
 })(window);
