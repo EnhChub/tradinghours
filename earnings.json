@@ -1,0 +1,186 @@
+{
+  "updated": "2026-04-26T04:26:27.905357+00:00",
+  "items": [
+    {
+      "ny": {
+        "y": 2026,
+        "m": 3,
+        "d": 26,
+        "h": 17,
+        "mn": 0
+      },
+      "type": "AMC",
+      "major": false,
+      "cos": [
+        "NE"
+      ]
+    },
+    {
+      "ny": {
+        "y": 2026,
+        "m": 3,
+        "d": 27,
+        "h": 17,
+        "mn": 0
+      },
+      "type": "AMC",
+      "major": false,
+      "cos": [
+        "AIJTY",
+        "ALCY",
+        "AMBR",
+        "AMKR"
+      ],
+      "extra": "ARE, AVB, AVBH, BBBY"
+    },
+    {
+      "ny": {
+        "y": 2026,
+        "m": 3,
+        "d": 27,
+        "h": 7,
+        "mn": 0
+      },
+      "type": "BMO",
+      "major": true,
+      "cos": [
+        "VZ"
+      ],
+      "extra": "DEA, FULC, ARLP, NWFL, LKFN, BFST, BMRC, CCBG"
+    },
+    {
+      "ny": {
+        "y": 2026,
+        "m": 3,
+        "d": 28,
+        "h": 17,
+        "mn": 0
+      },
+      "type": "AMC",
+      "major": true,
+      "cos": [
+        "TMUS",
+        "SBUX",
+        "V"
+      ],
+      "extra": "YDDL, PETZ, CCEP, BSHI, PSIG, TROO, PSIG, SLDE"
+    },
+    {
+      "ny": {
+        "y": 2026,
+        "m": 3,
+        "d": 28,
+        "h": 7,
+        "mn": 0
+      },
+      "type": "BMO",
+      "major": true,
+      "cos": [
+        "KO"
+      ],
+      "extra": "CBC, SFD, NAUT, WVE, PRPL, OPRA, FELE, PERF"
+    },
+    {
+      "ny": {
+        "y": 2026,
+        "m": 3,
+        "d": 29,
+        "h": 17,
+        "mn": 0
+      },
+      "type": "AMC",
+      "major": true,
+      "cos": [
+        "GOOGL",
+        "META",
+        "AMZN",
+        "QCOM",
+        "MSFT"
+      ],
+      "extra": "AMRZ, FT, EMF, HUHU, TPB, ASIC, GNRV, BASA"
+    },
+    {
+      "ny": {
+        "y": 2026,
+        "m": 3,
+        "d": 29,
+        "h": 7,
+        "mn": 0
+      },
+      "type": "BMO",
+      "major": true,
+      "cos": [
+        "ABBV"
+      ],
+      "extra": "JMSB, LXP, SNDL, NHTC, OXSQ, AMRN, IONS, SLGN"
+    },
+    {
+      "ny": {
+        "y": 2026,
+        "m": 3,
+        "d": 30,
+        "h": 17,
+        "mn": 0
+      },
+      "type": "AMC",
+      "major": true,
+      "cos": [
+        "AMGN",
+        "AAPL"
+      ],
+      "extra": "LANV, TRTN PR A, TLIH, ZGN, INHD, QETA, RWWI, GDLC"
+    },
+    {
+      "ny": {
+        "y": 2026,
+        "m": 3,
+        "d": 30,
+        "h": 7,
+        "mn": 0
+      },
+      "type": "BMO",
+      "major": true,
+      "cos": [
+        "MRK",
+        "LLY",
+        "MA",
+        "CAT"
+      ],
+      "extra": "INDV, TRN, PHAT, KYMR, STGW, BCPC, HGV, GVA"
+    },
+    {
+      "ny": {
+        "y": 2026,
+        "m": 4,
+        "d": 1,
+        "h": 17,
+        "mn": 0
+      },
+      "type": "AMC",
+      "major": false,
+      "cos": [
+        "ECBK",
+        "CET",
+        "AACB",
+        "PCF"
+      ],
+      "extra": "DTRK, WGRX, GWTI, SCIA, BRST, CFTN, INTT, ITIC"
+    },
+    {
+      "ny": {
+        "y": 2026,
+        "m": 4,
+        "d": 1,
+        "h": 7,
+        "mn": 0
+      },
+      "type": "BMO",
+      "major": true,
+      "cos": [
+        "CVX",
+        "XOM"
+      ],
+      "extra": "LBTYA, NEXT, CVEO, SHEN, BEPC, GTES, WNC, ATMU"
+    }
+  ]
+}
