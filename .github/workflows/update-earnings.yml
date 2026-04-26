@@ -1,0 +1,39 @@
+name: Update earnings data
+
+on:
+  schedule:
+    # Runs at 20:00 UTC daily, which is 06:00 Sydney (AEST) / 07:00 (AEDT)
+    - cron: '0 20 * * *'
+  workflow_dispatch:  # allows manual trigger from Actions tab
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run fetch script
+        env:
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+        run: python scripts/fetch_earnings.py
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add earnings.json
+          if git diff --staged --quiet; then
+            echo "No changes to earnings.json"
+          else
+            git commit -m "Auto-update earnings data"
+            git push
+          fi
