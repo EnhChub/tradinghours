@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<title>说明 · Markets</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23000'/%3E%3Cpath d='M20 65L40 45L55 60L80 30' stroke='%2330d158' stroke-width='8' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="wrap">
+
+  <nav class="nav">
+    <a href="index.html" class="nav-back">‹ 返回</a>
+    <div class="nav-links">
+      <a href="index.html">现在</a>
+      <a href="earnings.html">财报</a>
+      <a href="about.html" class="is-current">说明</a>
+    </div>
+  </nav>
+
+  <h1 class="page-title">说明</h1>
+
+  <div class="card">
+    <div class="about-section">
+      <h3>这是什么</h3>
+      <p>一个用于跟踪澳股 (ASX) 和美股交易时段、本周重要财报的私人小工具。所有时间都已转换为悉尼当地时间,免去心算。</p>
+    </div>
+
+    <div class="about-section">
+      <h3>交易时段定义</h3>
+      <ul>
+        <li><strong>ASX 集合竞价</strong>:7:00 – 10:00</li>
+        <li><strong>ASX 正常交易</strong>:10:00 – 16:00</li>
+        <li><strong>美股盘前</strong>:纽约 04:00 – 09:30</li>
+        <li><strong>美股正常交易</strong>:纽约 09:30 – 16:00</li>
+        <li><strong>美股盘后</strong>:纽约 16:00 – 20:00</li>
+      </ul>
+    </div>
+
+    <div class="about-section">
+      <h3>财报时间换算</h3>
+      <p>"美股盘前"财报通常在纽约时间 07:00 发布,落到悉尼是当日傍晚。"美股盘后"财报通常在纽约时间 16:30 后陆续发布,业绩电话会议约 17:00 开始,落到悉尼是次日清晨 7-8 点。</p>
+      <p>页面显示的时间以业绩电话会的标准时间 (纽约 17:00) 为准。如果只关心财报数字本身,实际可以早 30-60 分钟看到。</p>
+    </div>
+
+    <div class="about-section">
+      <h3>数据来源</h3>
+      <p>市场时段:交易所官方营业时间。财报日期:公司投资者关系页面 + 主流财经媒体公告。每周手动更新一次。</p>
+      <p>所有计算均在浏览器本地完成,不发送任何数据到服务器。时区转换通过浏览器的 Intl API,自动跟随夏令时切换。</p>
+    </div>
+
+    <div class="about-section">
+      <h3>关于精度</h3>
+      <p>本工具仅供参考,不构成投资建议。盘前盘后交易流动性低,价格波动剧烈。重要决策请以官方信息源为准。</p>
+    </div>
+  </div>
+
+  <p class="foot">私人工具 · 仅供参考</p>
+
+</div>
+</body>
+</html>
