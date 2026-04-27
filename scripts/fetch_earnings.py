@@ -38,13 +38,23 @@ MAJOR_TICKERS = {
     "BRK.B", "BRK.A", "JPM", "V", "MA", "BAC", "WFC", "C", "GS",
     "MS", "AXP", "BLK", "SCHW", "PYPL",
     # Healthcare
-    "UNH", "JNJ", "LLY", "PFE", "MRK", "ABBV", "TMO", "AMGN",
+    "UNH", "JNJ", "LLY", "PFE", "MRK", "ABBV", "TMO", "AMGN", "ISRG",
     # Energy & industrial
     "XOM", "CVX", "CAT", "BA", "GE", "HON", "DE", "BKR",
     # Telecoms / others
     "PG", "KO", "PEP", "T", "VZ", "TMUS", "ABNB", "UBER", "COIN",
     "GME", "CHWY",
+    # User-specific watchlist
+    "FIGR", "ONDS",
 }
+
+# Per-ticker fetch list — Finnhub's general calendar misses some stocks,
+# so for these we make a specific per-symbol API call to guarantee coverage.
+WATCHLIST_TICKERS = [
+    "TSLA", "AMD", "FIGR", "ONDS", "MRK", "MSFT", "TSM", "AVGO",
+    "GOOG", "GOOGL", "NVDA", "MU", "ISRG", "META", "ORCL", "UNH",
+    "AAPL", "AMZN",
+]
 
 # Friendly names for tickers (used when Finnhub returns just the ticker as name)
 TICKER_NAMES = {
@@ -77,12 +87,27 @@ TICKER_NAMES = {
     "T": "AT&T", "VZ": "Verizon", "TMUS": "T-Mobile",
     "ABNB": "Airbnb", "UBER": "Uber", "COIN": "Coinbase",
     "GME": "GameStop", "CHWY": "Chewy",
+    "FIGR": "Figure Technology",
+    "ONDS": "Ondas Holdings",
+    "ISRG": "Intuitive Surgical",
 }
 
 # ── HARDCODED FALLBACK earnings ──
-# These are confirmed earnings dates for major companies that should always
-# appear, even if Finnhub API misses them. Updated manually as needed.
-# Format: (ticker, "YYYY-MM-DD", "BMO" or "AMC")
+# These are confirmed earnings dates that should always appear, even if
+# Finnhub's free API misses them.
+#
+# 👉 HOW TO ADD A NEW TICKER YOURSELF:
+#    1. Find the official earnings date (Yahoo Finance, company IR page, etc)
+#    2. Add a line below in this exact format:
+#         ("TICKER", "YYYY-MM-DD", "BMO" or "AMC"),
+#       BMO = Before Market Open (pre-market)
+#       AMC = After Market Close (post-market)
+#    3. Optionally add the ticker to MAJOR_TICKERS above (line ~30) so it
+#       appears in "Upcoming Earnings" automatically. Skip this if you only
+#       want it searchable.
+#    4. Optionally add a friendly name to TICKER_NAMES above (line ~50).
+#    5. Commit. The next daily run will pick it up. Or trigger manually:
+#       Actions → Update earnings data → Run workflow.
 FALLBACK_EARNINGS = [
     # Q1 2026 earnings season (April-May 2026)
     # Mag 7 + key tech
@@ -110,16 +135,21 @@ FALLBACK_EARNINGS = [
     ("PFE", "2026-04-29", "BMO"),
     ("UBER", "2026-05-07", "BMO"),
     ("DIS", "2026-05-06", "BMO"),
-    # Late Q1 / early Q2 already-known calendars
+    # Late Q1 / early Q2
     ("PLTR", "2026-05-04", "AMC"),
     ("AMD", "2026-05-05", "AMC"),
     ("ABNB", "2026-05-06", "AMC"),
     ("SHOP", "2026-05-06", "BMO"),
     ("COIN", "2026-05-07", "AMC"),
-    # Mid-2026 (estimates - will be replaced by Finnhub data when closer)
-    ("NVDA", "2026-05-20", "AMC"),  # NVDA confirmed via Finnhub
-    # Late summer earnings (Q2 2026, reported Jul-Aug)
+    ("FIGR", "2026-05-11", "AMC"),  # Figure Technology — missing from Finnhub
+    ("ONDS", "2026-05-18", "BMO"),  # Ondas Holdings — missing from Finnhub
+    # NVDA (already in Finnhub but include anyway as safety)
+    ("NVDA", "2026-05-20", "AMC"),
+    # ── User custom additions go below ──
+
+    # ── Late Q2 2026 / mid-year (estimates) ──
     ("NFLX", "2026-07-16", "AMC"),
+    ("TSM", "2026-07-16", "BMO"),     # TSMC — missing from Finnhub
     ("TSLA", "2026-07-22", "AMC"),
     ("GOOGL", "2026-07-22", "AMC"),
     ("GOOG", "2026-07-22", "AMC"),
@@ -131,12 +161,15 @@ FALLBACK_EARNINGS = [
 ]
 
 
-def fetch_range(start_date, end_date):
-    url = "https://finnhub.io/api/v1/calendar/earnings?" + urlencode({
+def fetch_range(start_date, end_date, symbol=None):
+    params = {
         "from": start_date.isoformat(),
         "to": end_date.isoformat(),
         "token": API_KEY,
-    })
+    }
+    if symbol:
+        params["symbol"] = symbol
+    url = "https://finnhub.io/api/v1/calendar/earnings?" + urlencode(params)
     req = Request(url, headers={"User-Agent": "tradinghours-bot/1.0"})
     with urlopen(req, timeout=30) as resp:
         data = json.load(resp)
@@ -202,7 +235,24 @@ while chunk_start < end_date:
         print(f"  ERROR fetching chunk: {e}", file=sys.stderr)
     chunk_start = chunk_end + timedelta(days=1)
 
-print(f"Total raw entries from Finnhub: {len(all_raw)}")
+print(f"Total raw entries from Finnhub general calendar: {len(all_raw)}")
+
+# ── Per-ticker fetches for watchlist (more reliable than general calendar) ──
+print(f"Fetching per-ticker earnings for {len(WATCHLIST_TICKERS)} watchlist tickers...")
+per_ticker_added = 0
+for ticker in WATCHLIST_TICKERS:
+    try:
+        results = fetch_range(today, end_date, symbol=ticker)
+        if results:
+            all_raw.extend(results)
+            per_ticker_added += len(results)
+            print(f"  {ticker}: +{len(results)}")
+        else:
+            print(f"  {ticker}: (no upcoming earnings in Finnhub)")
+    except Exception as e:
+        print(f"  {ticker}: ERROR {e}", file=sys.stderr)
+print(f"Per-ticker fetches added {per_ticker_added} entries")
+print(f"Total raw entries (general + per-ticker): {len(all_raw)}")
 
 # Normalize
 normalized = []
