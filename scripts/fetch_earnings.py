@@ -1,10 +1,10 @@
 """
-Fetch 90 days of US earnings from Finnhub and save to earnings.json.
-Output structure:
+Fetch 180 days of US earnings from Finnhub + manually curated macro events.
+Output structure (earnings.json):
   {
     "updated": ISO timestamp,
-    "items": [...]      # this week, curated for homepage display (with majors flagged)
-    "all": [...]        # full 90-day catalog, for search/favourites
+    "all": [...]      # full 180-day catalog of earnings (for search)
+    "macro": [...]    # manually curated FOMC / CPI / GDP / etc events
   }
 Runs daily via GitHub Actions.
 """
@@ -20,22 +20,89 @@ if not API_KEY:
     print("ERROR: FINNHUB_API_KEY not set", file=sys.stderr)
     sys.exit(1)
 
-# Companies we want to flag as "major" (bold in UI, surface on homepage)
+# Major tickers — flagged as "important" so they bubble to the top.
+# These are the ones the user will most likely care about.
 MAJOR_TICKERS = {
+    # Mega-cap tech
     "AAPL", "MSFT", "GOOGL", "GOOG", "AMZN", "META", "NVDA", "TSLA",
-    "BRK.B", "BRK.A", "JPM", "V", "MA", "UNH", "XOM", "WMT", "JNJ",
-    "PG", "HD", "AVGO", "LLY", "KO", "PEP", "MRK", "ABBV", "CVX",
-    "COST", "CRM", "ORCL", "ADBE", "NFLX", "AMD", "QCOM", "TMO",
-    "BAC", "WFC", "C", "GS", "MS", "AXP", "BLK", "DIS", "MCD",
-    "NKE", "SBUX", "T", "VZ", "TMUS", "INTC", "CSCO", "IBM",
-    "CAT", "BA", "GE", "HON", "DE", "PFE", "AMGN", "PYPL", "UBER",
-    "SHOP", "SQ", "PLTR", "ABNB", "COIN", "SNOW", "DDOG", "CRWD",
-    "ZS", "PANW", "FTNT", "MU", "ASML", "TSM", "ARM",
+    # Other tech & semi
+    "AVGO", "ORCL", "CRM", "ADBE", "NFLX", "AMD", "QCOM", "INTC",
+    "CSCO", "IBM", "MU", "TXN", "ASML", "TSM", "ARM", "MRVL",
+    # Cloud / SaaS
+    "SHOP", "SNOW", "DDOG", "CRWD", "ZS", "PANW", "FTNT", "NOW",
+    "WDAY", "INTU", "PLTR", "MDB",
+    # Consumer
+    "WMT", "COST", "HD", "TGT", "LOW", "MCD", "SBUX", "NKE", "DIS",
+    # Finance
+    "BRK.B", "BRK.A", "JPM", "V", "MA", "BAC", "WFC", "C", "GS",
+    "MS", "AXP", "BLK", "SCHW",
+    # Healthcare
+    "UNH", "JNJ", "LLY", "PFE", "MRK", "ABBV", "TMO", "AMGN",
+    # Energy & industrial
+    "XOM", "CVX", "CAT", "BA", "GE", "HON", "DE",
+    # Others
+    "PG", "KO", "PEP", "T", "VZ", "TMUS", "ABNB", "UBER", "COIN",
+    "NFLX", "GME", "CHWY",
 }
+
+# ── Manually curated macro events ──
+# Each: { date: 'YYYY-MM-DD', time_ny: 'HH:MM' (24h NY local), name: '...', country: '...', tag: '...' }
+# Time is when the data is released, in NY local time
+MACRO_EVENTS = [
+    # FOMC meetings 2026 (8 per year - confirmed pattern)
+    {"date": "2026-04-29", "time_ny": "14:00", "name": "FOMC 利率决议", "country": "US", "tag": "FOMC"},
+    {"date": "2026-06-17", "time_ny": "14:00", "name": "FOMC 利率决议", "country": "US", "tag": "FOMC"},
+    {"date": "2026-07-29", "time_ny": "14:00", "name": "FOMC 利率决议", "country": "US", "tag": "FOMC"},
+    {"date": "2026-09-16", "time_ny": "14:00", "name": "FOMC 利率决议", "country": "US", "tag": "FOMC"},
+    {"date": "2026-11-04", "time_ny": "14:00", "name": "FOMC 利率决议", "country": "US", "tag": "FOMC"},
+    {"date": "2026-12-16", "time_ny": "14:00", "name": "FOMC 利率决议", "country": "US", "tag": "FOMC"},
+
+    # CPI releases (typically 2nd week of each month, 08:30 ET)
+    {"date": "2026-05-12", "time_ny": "08:30", "name": "美国 CPI 通胀数据", "country": "US", "tag": "CPI"},
+    {"date": "2026-06-10", "time_ny": "08:30", "name": "美国 CPI 通胀数据", "country": "US", "tag": "CPI"},
+    {"date": "2026-07-15", "time_ny": "08:30", "name": "美国 CPI 通胀数据", "country": "US", "tag": "CPI"},
+    {"date": "2026-08-12", "time_ny": "08:30", "name": "美国 CPI 通胀数据", "country": "US", "tag": "CPI"},
+    {"date": "2026-09-10", "time_ny": "08:30", "name": "美国 CPI 通胀数据", "country": "US", "tag": "CPI"},
+    {"date": "2026-10-13", "time_ny": "08:30", "name": "美国 CPI 通胀数据", "country": "US", "tag": "CPI"},
+
+    # GDP releases (quarterly, 1st month after quarter end)
+    {"date": "2026-04-30", "time_ny": "08:30", "name": "美国 Q1 GDP 初值", "country": "US", "tag": "GDP"},
+    {"date": "2026-07-30", "time_ny": "08:30", "name": "美国 Q2 GDP 初值", "country": "US", "tag": "GDP"},
+    {"date": "2026-10-29", "time_ny": "08:30", "name": "美国 Q3 GDP 初值", "country": "US", "tag": "GDP"},
+
+    # Non-farm Payrolls (1st Friday of each month, 08:30 ET)
+    {"date": "2026-05-01", "time_ny": "08:30", "name": "美国非农就业数据", "country": "US", "tag": "NFP"},
+    {"date": "2026-06-05", "time_ny": "08:30", "name": "美国非农就业数据", "country": "US", "tag": "NFP"},
+    {"date": "2026-07-02", "time_ny": "08:30", "name": "美国非农就业数据", "country": "US", "tag": "NFP"},
+    {"date": "2026-08-07", "time_ny": "08:30", "name": "美国非农就业数据", "country": "US", "tag": "NFP"},
+    {"date": "2026-09-04", "time_ny": "08:30", "name": "美国非农就业数据", "country": "US", "tag": "NFP"},
+    {"date": "2026-10-02", "time_ny": "08:30", "name": "美国非农就业数据", "country": "US", "tag": "NFP"},
+
+    # ECB rate decisions (typically every 6 weeks)
+    {"date": "2026-04-30", "time_ny": "08:15", "name": "欧央行利率决议", "country": "EU", "tag": "ECB"},
+    {"date": "2026-06-04", "time_ny": "08:15", "name": "欧央行利率决议", "country": "EU", "tag": "ECB"},
+    {"date": "2026-07-23", "time_ny": "08:15", "name": "欧央行利率决议", "country": "EU", "tag": "ECB"},
+    {"date": "2026-09-10", "time_ny": "08:15", "name": "欧央行利率决议", "country": "EU", "tag": "ECB"},
+    {"date": "2026-10-29", "time_ny": "08:15", "name": "欧央行利率决议", "country": "EU", "tag": "ECB"},
+
+    # ISM Manufacturing PMI (1st business day of month)
+    {"date": "2026-05-01", "time_ny": "10:00", "name": "ISM 制造业 PMI", "country": "US", "tag": "PMI"},
+    {"date": "2026-06-01", "time_ny": "10:00", "name": "ISM 制造业 PMI", "country": "US", "tag": "PMI"},
+    {"date": "2026-07-01", "time_ny": "10:00", "name": "ISM 制造业 PMI", "country": "US", "tag": "PMI"},
+    {"date": "2026-08-03", "time_ny": "10:00", "name": "ISM 制造业 PMI", "country": "US", "tag": "PMI"},
+    {"date": "2026-09-01", "time_ny": "10:00", "name": "ISM 制造业 PMI", "country": "US", "tag": "PMI"},
+    {"date": "2026-10-01", "time_ny": "10:00", "name": "ISM 制造业 PMI", "country": "US", "tag": "PMI"},
+
+    # RBA rate decisions (Australia - 1st Tuesday each month except January)
+    {"date": "2026-05-05", "time_ny": "00:30", "name": "澳央行 RBA 利率决议", "country": "AU", "tag": "RBA"},
+    {"date": "2026-06-02", "time_ny": "00:30", "name": "澳央行 RBA 利率决议", "country": "AU", "tag": "RBA"},
+    {"date": "2026-07-07", "time_ny": "00:30", "name": "澳央行 RBA 利率决议", "country": "AU", "tag": "RBA"},
+    {"date": "2026-08-04", "time_ny": "00:30", "name": "澳央行 RBA 利率决议", "country": "AU", "tag": "RBA"},
+    {"date": "2026-09-29", "time_ny": "00:30", "name": "澳央行 RBA 利率决议", "country": "AU", "tag": "RBA"},
+]
 
 
 def fetch_range(start_date, end_date):
-    """Hit the Finnhub earnings calendar for a date range."""
     url = "https://finnhub.io/api/v1/calendar/earnings?" + urlencode({
         "from": start_date.isoformat(),
         "to": end_date.isoformat(),
@@ -48,7 +115,6 @@ def fetch_range(start_date, end_date):
 
 
 def normalize_entry(item):
-    """Turn one Finnhub entry into our internal flat format."""
     date_str = item.get("date")
     sym = (item.get("symbol") or "").upper()
     if not date_str or not sym:
@@ -61,103 +127,91 @@ def normalize_entry(item):
         return None
     h = 7 if session == "BMO" else 17
     return {
-        "symbol": sym,
-        "name": item.get("name") or sym,
+        "s": sym,
+        "n": item.get("name") or sym,
         "ny": {"y": y, "m": m - 1, "d": d, "h": h, "mn": 0},
-        "type": session,
-        "epsEstimate": item.get("epsEstimate"),
-        "revenueEstimate": item.get("revenueEstimate"),
+        "t": session,
+        "maj": sym in MAJOR_TICKERS,  # boolean flag for major tickers
     }
 
 
 # ── Pull data ──
 today = datetime.now(timezone.utc).date()
-ninety_days = today + timedelta(days=90)
+end_date = today + timedelta(days=180)
 
-print(f"Fetching earnings from {today} to {ninety_days}...")
-try:
-    raw = fetch_range(today, ninety_days)
-except Exception as e:
-    print(f"ERROR fetching: {e}", file=sys.stderr)
-    sys.exit(1)
-print(f"Got {len(raw)} entries from Finnhub")
+print(f"Fetching earnings from {today} to {end_date}...")
 
-# Normalize all entries
+# Finnhub API may have a per-call range limit (~3 months). Split into chunks.
+all_raw = []
+chunk_start = today
+while chunk_start < end_date:
+    chunk_end = min(chunk_start + timedelta(days=85), end_date)
+    print(f"  chunk: {chunk_start} -> {chunk_end}")
+    try:
+        chunk = fetch_range(chunk_start, chunk_end)
+        all_raw.extend(chunk)
+    except Exception as e:
+        print(f"  ERROR fetching chunk: {e}", file=sys.stderr)
+    chunk_start = chunk_end + timedelta(days=1)
+
+print(f"Got {len(all_raw)} raw entries")
+
+# Normalize and dedupe by (symbol, date, session)
+seen = set()
 all_entries = []
-for it in raw:
+for it in all_raw:
     norm = normalize_entry(it)
-    if norm:
-        all_entries.append(norm)
+    if not norm:
+        continue
+    key = (norm["s"], norm["ny"]["y"], norm["ny"]["m"], norm["ny"]["d"], norm["t"])
+    if key in seen:
+        continue
+    seen.add(key)
+    # Optionally include EPS estimate for major tickers only (saves bytes)
+    eps = it.get("epsEstimate")
+    if eps is not None and norm["maj"]:
+        norm["eps"] = eps
+    all_entries.append(norm)
 
-# Sort by date, then BMO before AMC
+
 def sort_key(e):
     ny = e["ny"]
-    return (ny["y"], ny["m"], ny["d"], ny["h"])
+    return (ny["y"], ny["m"], ny["d"], ny["h"], 0 if e.get("maj") else 1, e["s"])
+
 
 all_entries.sort(key=sort_key)
-print(f"Normalized to {len(all_entries)} entries")
+print(f"Normalized to {len(all_entries)} unique entries")
 
-# ── Build "this week" curated list (for homepage display) ──
-# Group entries from today through 7 days out by (date, session)
-seven_days = today + timedelta(days=7)
-groups = {}
-for e in all_entries:
-    ny = e["ny"]
-    e_date = datetime(ny["y"], ny["m"] + 1, ny["d"]).date()
-    if e_date < today or e_date > seven_days:
-        continue
-    key = (ny["y"], ny["m"], ny["d"], e["type"])
-    groups.setdefault(key, []).append(e)
+# ── Filter macro events to just the next 180 days ──
+end_iso = end_date.isoformat()
+today_iso = today.isoformat()
+macro_filtered = []
+for e in MACRO_EVENTS:
+    if today_iso <= e["date"] <= end_iso:
+        y, m, d = map(int, e["date"].split("-"))
+        h, mn = map(int, e["time_ny"].split(":"))
+        macro_filtered.append({
+            "name": e["name"],
+            "tag": e["tag"],
+            "country": e["country"],
+            "ny": {"y": y, "m": m - 1, "d": d, "h": h, "mn": mn},
+        })
+macro_filtered.sort(key=lambda e: (e["ny"]["y"], e["ny"]["m"], e["ny"]["d"], e["ny"]["h"]))
+print(f"Filtered to {len(macro_filtered)} macro events in window")
 
-curated = []
-for (y, m, d, session), companies in sorted(groups.items()):
-    majors = [c for c in companies if c["symbol"] in MAJOR_TICKERS]
-    others = [c for c in companies if c["symbol"] not in MAJOR_TICKERS]
-
-    if not majors and len(others) > 30:
-        others = sorted(others, key=lambda c: c["symbol"])[:8]
-    if not majors and not others:
-        continue
-
-    h = 7 if session == "BMO" else 17
-    cos_list = [c["name"] or c["symbol"] for c in (majors[:6] if majors else others[:4])]
-    extras_syms = []
-    if majors:
-        extras_syms = [c["symbol"] for c in others[:8]]
-    elif len(others) > 4:
-        extras_syms = [c["symbol"] for c in others[4:12]]
-
-    entry = {
-        "ny": {"y": y, "m": m, "d": d, "h": h, "mn": 0},
-        "type": session,
-        "major": len(majors) > 0,
-        "cos": cos_list,
-    }
-    if extras_syms:
-        entry["extra"] = ", ".join(extras_syms)
-    curated.append(entry)
-
-# Slim "all" entries down for transport (drop nulls to reduce file size)
-all_slim = []
-for e in all_entries:
-    slim = {
-        "s": e["symbol"],
-        "n": e["name"],
-        "ny": e["ny"],
-        "t": e["type"],
-    }
-    if e.get("epsEstimate") is not None:
-        slim["eps"] = e["epsEstimate"]
-    all_slim.append(slim)
-
+# ── Output ──
 out = {
     "updated": datetime.now(timezone.utc).isoformat(),
-    "items": curated,
-    "all": all_slim,
+    "all": all_entries,
+    "macro": macro_filtered,
 }
 
 with open("earnings.json", "w", encoding="utf-8") as f:
     json.dump(out, f, ensure_ascii=False, separators=(",", ":"))
 
-print(f"Wrote {len(curated)} curated items + {len(all_slim)} total entries")
-print(f"File size approx: {os.path.getsize('earnings.json') / 1024:.1f} KB")
+size_kb = os.path.getsize("earnings.json") / 1024
+print(f"Wrote {len(all_entries)} earnings + {len(macro_filtered)} macro events")
+print(f"File size: {size_kb:.1f} KB")
+
+major_count = sum(1 for e in all_entries if e.get("maj"))
+print(f"  ({major_count} major tickers in 180 days)")
