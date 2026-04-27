@@ -2,22 +2,21 @@ name: Update earnings data
 
 on:
   schedule:
-    # Runs at 20:00 UTC daily, which is 06:00 Sydney (AEST) / 07:00 (AEDT)
-    - cron: '0 20 * * *'
-  workflow_dispatch:  # allows manual trigger from Actions tab
-
-permissions:
-  contents: write
+    # Run every 4 hours
+    - cron: '0 */4 * * *'
+  workflow_dispatch:  # Allow manual trigger
 
 jobs:
-  fetch:
+  update:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v5
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
@@ -26,13 +25,13 @@ jobs:
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
         run: python scripts/fetch_earnings.py
 
-      - name: Commit and push if changed
+      - name: Commit changes
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
           git add earnings.json
           if git diff --staged --quiet; then
-            echo "No changes to earnings.json"
+            echo "No changes to commit"
           else
             git commit -m "Auto-update earnings data"
             git push
