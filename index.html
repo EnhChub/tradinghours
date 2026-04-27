@@ -87,7 +87,7 @@
     <div id="agenda"></div>
   </div>
 
-  <p class="foot">All times in Sydney local · Auto-adjusts for DST</p>
+  <p class="foot">All times in Sydney local · Auto-adjusts for DST · <span id="updated-status">Loading…</span></p>
 
 </div>
 
@@ -254,7 +254,26 @@
   M.onEarningsUpdate(() => {
     renderAgenda();
     if (searchInput.value.trim()) renderSearchResults(searchInput.value);
+    updateStatusFooter();
   });
+
+  function updateStatusFooter() {
+    const updated = M.getEarningsUpdatedAt();
+    const el = document.getElementById('updated-status');
+    if (!updated) {
+      el.textContent = 'Data offline';
+      return;
+    }
+    const dt = new Date(updated);
+    const ageMin = Math.floor((Date.now() - dt.getTime()) / 60000);
+    let ageText;
+    if (ageMin < 60) ageText = ageMin + ' min ago';
+    else if (ageMin < 1440) ageText = Math.floor(ageMin / 60) + ' h ago';
+    else ageText = Math.floor(ageMin / 1440) + ' d ago';
+    el.textContent = 'Updated ' + ageText;
+  }
+  updateStatusFooter();
+  setInterval(updateStatusFooter, 60000);
 })();
 </script>
 </body>
