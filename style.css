@@ -346,35 +346,29 @@ a { color: var(--blue-text); text-decoration: none; }
 
 .tl-now {
   position: absolute;
-  top: -6px; bottom: -6px;
+  top: -10px; bottom: -10px;
   left: 0;
   width: 2px;
-  background: var(--text-1);
+  background: var(--blue);
   z-index: 5;
   border-radius: 2px;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.95);
 }
 .tl-now::before {
   content: '';
   position: absolute;
-  top: -3px;
-  left: -3px;
-  width: 8px; height: 8px;
+  bottom: -4px;
+  left: -4px;
+  width: 10px; height: 10px;
   border-radius: 50%;
-  background: var(--text-1);
+  background: var(--blue);
+  border: 2px solid var(--card);
+  box-sizing: content-box;
 }
-.tl-now-label {
-  position: absolute;
-  top: -2px;
-  left: 0;
-  transform: translateX(-50%);
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  color: var(--card);
-  background: var(--text-1);
-  padding: 2px 7px;
-  border-radius: 4px;
-  z-index: 6;
+@media (prefers-color-scheme: dark) {
+  .tl-now {
+    box-shadow: 0 0 0 3px rgba(28, 28, 30, 0.95);
+  }
 }
 
 .tl-axis {
@@ -437,7 +431,90 @@ a { color: var(--blue-text); text-decoration: none; }
 }
 .card-sub { font-size: 11px; color: var(--text-3); font-weight: 500; }
 
-/* ─── Agenda items (cleaner, no big icons) ─── */
+/* ─── Agenda items (grouped by date+session) ─── */
+.ag-group {
+  padding: 14px 0;
+  border-top: 0.5px solid var(--divider);
+}
+.ag-group:first-child { padding-top: 4px; border-top: 0; }
+
+.ag-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  gap: 8px;
+}
+.ag-group-when {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-1);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.005em;
+}
+.ag-group-when-rel {
+  font-weight: 500;
+  color: var(--text-3);
+  font-size: 12px;
+  margin-left: 6px;
+}
+.ag-group-when.is-soon .ag-group-when-rel { color: var(--orange-text); font-weight: 700; }
+.ag-group-when.is-imminent .ag-group-when-rel { color: var(--red-text); font-weight: 700; }
+.ag-group-tag {
+  display: inline-block;
+  font-size: 10px;
+  padding: 2px 7px;
+  background: var(--gray-bg);
+  color: var(--gray-text);
+  border-radius: 4px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  flex: none;
+}
+
+.ag-companies {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ag-company {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+.ag-company-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ag-company-sym {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-1);
+  letter-spacing: -0.01em;
+}
+.ag-company-sym.is-fav::before {
+  content: '★';
+  color: var(--yellow);
+  margin-right: 4px;
+  font-size: 12px;
+}
+.ag-company-name {
+  font-size: 13px;
+  color: var(--text-2);
+  font-weight: 400;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 220px;
+}
+
+/* Old single-row agenda kept for backwards compatibility */
 .ag-item {
   display: grid;
   grid-template-columns: 1fr auto auto;
@@ -573,12 +650,17 @@ a { color: var(--blue-text); text-decoration: none; }
   .card { padding: 15px; border-radius: 14px; }
   .tl-card { padding: 13px; }
   .hero-clock { font-size: 38px; }
+  .ag-group { padding: 12px 0; }
+  .ag-group-when { font-size: 12px; }
+  .ag-group-when-rel { font-size: 11px; }
+  .ag-company-sym { font-size: 13px; }
+  .ag-company-name { font-size: 12px; max-width: 150px; }
   .ag-item { gap: 10px; padding: 11px 0; }
   .ag-sym { font-size: 14px; }
   .ag-name { font-size: 12px; max-width: 140px; }
   .ag-when { font-size: 11px; }
   .tl-axis-tick .num { font-size: 11px; }
-  .search-input { font-size: 16px; }  /* prevents iOS zoom */
+  .search-input { font-size: 16px; }
 }
 
 @media (max-width: 360px) {

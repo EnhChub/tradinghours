@@ -274,6 +274,38 @@
     return { items, days: usedDays };
   }
 
+  // Group items by (date in Sydney, session type) so same-day same-session
+  // earnings (e.g. META + MSFT + GOOGL + AMZN all Wed AMC) display together.
+  function groupItemsByDateSession(items) {
+    const groups = new Map();
+    items.forEach(it => {
+      const p = partsInTz(SYD, it.sydDate);
+      const key = p.year + '-' + p.month + '-' + p.day + '-' + it.type;
+      if (!groups.has(key)) {
+        groups.set(key, {
+          sydDate: it.sydDate,
+          type: it.type,
+          companies: [],
+        });
+      }
+      groups.get(key).companies.push(it);
+    });
+    // Sort groups chronologically; within each group, favs first then majors then alpha
+    const out = Array.from(groups.values());
+    out.sort((a, b) => a.sydDate - b.sydDate);
+    out.forEach(g => {
+      g.companies.sort((a, b) => {
+        if (a.favourite && !b.favourite) return -1;
+        if (!a.favourite && b.favourite) return 1;
+        if (a.major && !b.major) return -1;
+        if (!a.major && b.major) return 1;
+        return a.symbol.localeCompare(b.symbol);
+      });
+    });
+    return out;
+  }
+
+  // Render grouped agenda (same-day earnings clustered together)
   function renderAgendaItems(items, container, opts) {
     opts = opts || {};
     const showFavBtn = opts.showFavBtn !== false;
@@ -288,39 +320,48 @@
       return;
     }
 
-    items.forEach(it => {
-      const div = document.createElement('div');
-      div.className = 'ag-item';
+    const groups = groupItemsByDateSession(items);
 
-      const rel = relativeDay(it.sydDate, now);
-      const diffHours = (it.sydDate - now) / (3600 * 1000);
+    groups.forEach(group => {
+      const div = document.createElement('div');
+      div.className = 'ag-group';
+
+      const rel = relativeDay(group.sydDate, now);
+      const diffHours = (group.sydDate - now) / (3600 * 1000);
       let whenClass = '';
       if (diffHours < 6 && diffHours > -1) whenClass = 'is-imminent';
       else if (diffHours < 36) whenClass = 'is-soon';
 
-      const tagText = it.type === 'BMO' ? 'Pre-market' : 'After close';
-      const symClass = it.favourite ? 'is-fav' : '';
-      const nameSpan = (it.name && it.name !== it.symbol)
-        ? '<span class="ag-name">' + escapeHtml(it.name) + '</span>'
-        : '';
+      const tagText = group.type === 'BMO' ? 'Pre-market' : 'After close';
+      const relSpan = rel ? '<span class="ag-group-when-rel">· ' + rel + '</span>' : '';
 
-      const favBtn = showFavBtn
-        ? '<button class="fav-btn ' + (it.favourite ? 'is-fav' : '') + '" data-sym="' + it.symbol + '">' + starSvg() + '</button>'
-        : '';
+      let companiesHTML = '<div class="ag-companies">';
+      group.companies.forEach(it => {
+        const symClass = it.favourite ? 'is-fav' : '';
+        const nameSpan = (it.name && it.name !== it.symbol)
+          ? '<span class="ag-company-name">' + escapeHtml(it.name) + '</span>'
+          : '';
+        const favBtn = showFavBtn
+          ? '<button class="fav-btn ' + (it.favourite ? 'is-fav' : '') + '" data-sym="' + it.symbol + '">' + starSvg() + '</button>'
+          : '';
+        companiesHTML += `
+          <div class="ag-company">
+            <div class="ag-company-info">
+              <span class="ag-company-sym ${symClass}">${it.symbol}</span>
+              ${nameSpan}
+            </div>
+            ${favBtn}
+          </div>
+        `;
+      });
+      companiesHTML += '</div>';
 
       div.innerHTML = `
-        <div class="ag-info">
-          <div class="ag-row1">
-            <span class="ag-sym ${symClass}">${it.symbol}</span>
-            ${nameSpan}
-          </div>
-          <span class="ag-tag">${tagText}</span>
+        <div class="ag-group-head">
+          <span class="ag-group-when ${whenClass}">${fmtSydneyShort(group.sydDate)}${relSpan}</span>
+          <span class="ag-group-tag">${tagText}</span>
         </div>
-        <div class="ag-when ${whenClass}">
-          ${fmtSydneyShort(it.sydDate)}
-          ${rel ? '<span class="ag-when-rel">' + rel + '</span>' : ''}
-        </div>
-        ${favBtn}
+        ${companiesHTML}
       `;
       container.appendChild(div);
     });
