@@ -274,38 +274,57 @@
     return { items, days: usedDays };
   }
 
-  // Group items by (date in Sydney, session type) so same-day same-session
-  // earnings (e.g. META + MSFT + GOOGL + AMZN all Wed AMC) display together.
-  function groupItemsByDateSession(items) {
-    const groups = new Map();
+  // Group items by Sydney date, then by session within each day.
+  // Returns: [{ sydDateMidnight, dayKey, sessions: [{type, time, items: []}] }, ...]
+  function groupItemsByDay(items) {
+    const dayMap = new Map();
     items.forEach(it => {
       const p = partsInTz(SYD, it.sydDate);
-      const key = p.year + '-' + p.month + '-' + p.day + '-' + it.type;
-      if (!groups.has(key)) {
-        groups.set(key, {
-          sydDate: it.sydDate,
-          type: it.type,
-          companies: [],
+      const dayKey = p.year + '-' + p.month + '-' + p.day;
+      if (!dayMap.has(dayKey)) {
+        dayMap.set(dayKey, {
+          dayKey,
+          sydDate: it.sydDate,  // any item's date works as anchor for relative day calc
+          sessions: new Map(),
         });
       }
-      groups.get(key).companies.push(it);
+      const day = dayMap.get(dayKey);
+      // Session key includes the time (in case BMO has different times)
+      const sessP = partsInTz(SYD, it.sydDate);
+      const sessKey = it.type + '-' + pad(sessP.hour) + ':' + pad(sessP.minute);
+      if (!day.sessions.has(sessKey)) {
+        day.sessions.set(sessKey, {
+          type: it.type,
+          time: pad(sessP.hour) + ':' + pad(sessP.minute),
+          sortTime: sessP.hour * 60 + sessP.minute,
+          firstDate: it.sydDate,
+          items: [],
+        });
+      }
+      day.sessions.get(sessKey).items.push(it);
     });
-    // Sort groups chronologically; within each group, favs first then majors then alpha
-    const out = Array.from(groups.values());
-    out.sort((a, b) => a.sydDate - b.sydDate);
-    out.forEach(g => {
-      g.companies.sort((a, b) => {
-        if (a.favourite && !b.favourite) return -1;
-        if (!a.favourite && b.favourite) return 1;
-        if (a.major && !b.major) return -1;
-        if (!a.major && b.major) return 1;
-        return a.symbol.localeCompare(b.symbol);
+
+    // Convert maps to sorted arrays
+    const days = Array.from(dayMap.values());
+    days.sort((a, b) => a.sydDate - b.sydDate);
+    days.forEach(day => {
+      day.sessions = Array.from(day.sessions.values()).sort((a, b) => a.sortTime - b.sortTime);
+      day.sessions.forEach(sess => {
+        // Sort tickers within session: favs > majors > alpha
+        sess.items.sort((a, b) => {
+          if (a.favourite && !b.favourite) return -1;
+          if (!a.favourite && b.favourite) return 1;
+          if (a.major && !b.major) return -1;
+          if (!a.major && b.major) return 1;
+          return a.symbol.localeCompare(b.symbol);
+        });
       });
     });
-    return out;
+    return days;
   }
 
-  // Render grouped agenda (same-day earnings clustered together)
+  // Render day-grouped agenda. Same-day same-session earnings appear as
+  // ticker chips on a single row. Tap a chip to expand company details.
   function renderAgendaItems(items, container, opts) {
     opts = opts || {};
     const showFavBtn = opts.showFavBtn !== false;
@@ -320,62 +339,128 @@
       return;
     }
 
-    const groups = groupItemsByDateSession(items);
+    const days = groupItemsByDay(items);
+    // Build a quick lookup for chip click handlers
+    const itemBySym = new Map();
+    items.forEach(it => itemBySym.set(it.symbol, it));
 
-    groups.forEach(group => {
-      const div = document.createElement('div');
-      div.className = 'ag-group';
+    days.forEach(day => {
+      const dayDiv = document.createElement('div');
+      dayDiv.className = 'ag-day';
 
-      const rel = relativeDay(group.sydDate, now);
-      const diffHours = (group.sydDate - now) / (3600 * 1000);
-      let whenClass = '';
-      if (diffHours < 6 && diffHours > -1) whenClass = 'is-imminent';
-      else if (diffHours < 36) whenClass = 'is-soon';
+      const dayP = partsInTz(SYD, day.sydDate);
+      // Get full month name for clarity (April vs Apr)
+      const fullMonthFmt = new Intl.DateTimeFormat('en-GB', { timeZone: SYD, month: 'long' });
+      const monthLong = fullMonthFmt.format(day.sydDate);
+      const dateText = DAY_LONG[dayP.dayIdx] + ', ' + dayP.day + ' ' + monthLong;
 
-      const tagText = group.type === 'BMO' ? 'Pre-market' : 'After close';
-      const relSpan = rel ? '<span class="ag-group-when-rel">· ' + rel + '</span>' : '';
+      const rel = relativeDay(day.sydDate, now);
+      const diffDays = Math.round((day.sydDate - now) / (24 * 3600 * 1000));
+      let relClass = '';
+      if (rel === 'today') relClass = 'is-today';
+      else if (rel === 'tomorrow') relClass = 'is-tomorrow';
+      else if (diffDays >= 0 && diffDays <= 3) relClass = 'is-soon';
+      const relSpan = rel ? '<span class="ag-day-rel ' + relClass + '">' + rel + '</span>' : '';
 
-      let companiesHTML = '<div class="ag-companies">';
-      group.companies.forEach(it => {
-        const symClass = it.favourite ? 'is-fav' : '';
-        const nameSpan = (it.name && it.name !== it.symbol)
-          ? '<span class="ag-company-name">' + escapeHtml(it.name) + '</span>'
-          : '';
-        const favBtn = showFavBtn
-          ? '<button class="fav-btn ' + (it.favourite ? 'is-fav' : '') + '" data-sym="' + it.symbol + '">' + starSvg() + '</button>'
-          : '';
-        companiesHTML += `
-          <div class="ag-company">
-            <div class="ag-company-info">
-              <span class="ag-company-sym ${symClass}">${it.symbol}</span>
-              ${nameSpan}
-            </div>
-            ${favBtn}
+      let sessionsHTML = '';
+      day.sessions.forEach(sess => {
+        const tagText = sess.type === 'BMO' ? 'BMO' : 'AMC';
+        let chipsHTML = '<div class="ag-tickers">';
+        sess.items.forEach(it => {
+          const cls = ['ag-chip'];
+          if (it.favourite) cls.push('is-fav');
+          else if (it.major) cls.push('is-major');
+          chipsHTML += '<button class="' + cls.join(' ') + '" data-sym="' + it.symbol + '">' + it.symbol + '</button>';
+        });
+        chipsHTML += '</div>';
+        sessionsHTML += `
+          <div class="ag-session-row">
+            <div class="ag-session-time">${sess.time}<span class="ag-session-tag">${tagText}</span></div>
+            ${chipsHTML}
           </div>
         `;
       });
-      companiesHTML += '</div>';
 
-      div.innerHTML = `
-        <div class="ag-group-head">
-          <span class="ag-group-when ${whenClass}">${fmtSydneyShort(group.sydDate)}${relSpan}</span>
-          <span class="ag-group-tag">${tagText}</span>
+      dayDiv.innerHTML = `
+        <div class="ag-day-head">
+          <span class="ag-day-date">${dateText}</span>
+          ${relSpan}
         </div>
-        ${companiesHTML}
+        ${sessionsHTML}
       `;
-      container.appendChild(div);
+      container.appendChild(dayDiv);
     });
 
-    if (showFavBtn) {
-      container.querySelectorAll('.fav-btn').forEach(btn => {
-        btn.addEventListener('click', e => {
-          e.stopPropagation();
-          const sym = btn.getAttribute('data-sym');
-          toggleFavourite(sym);
-          if (onChange) onChange();
-        });
-      });
+    // Wire up chip clicks: tap to expand details (with company name + fav button)
+    let openChip = null;
+    let openDetail = null;
+    function closeOpenDetail() {
+      if (openDetail) {
+        openDetail.remove();
+        openDetail = null;
+      }
+      if (openChip) {
+        openChip.classList.remove('is-expanded');
+        openChip = null;
+      }
     }
+
+    container.querySelectorAll('.ag-chip').forEach(chip => {
+      chip.addEventListener('click', e => {
+        e.stopPropagation();
+        const sym = chip.getAttribute('data-sym');
+        const it = itemBySym.get(sym);
+        if (!it) return;
+
+        // Toggle: if same chip clicked, close
+        if (openChip === chip) {
+          closeOpenDetail();
+          return;
+        }
+        closeOpenDetail();
+
+        // Build detail panel
+        const detail = document.createElement('div');
+        detail.className = 'ag-detail';
+        const nameText = (it.name && it.name !== it.symbol) ? it.name : '(no full name available)';
+        detail.innerHTML = `
+          <div class="ag-detail-info">
+            <div class="ag-detail-sym">${it.symbol}</div>
+            <div class="ag-detail-name">${escapeHtml(nameText)}</div>
+          </div>
+          ${showFavBtn ? '<button class="ag-detail-fav ' + (it.favourite ? 'is-fav' : '') + '" data-sym="' + it.symbol + '">' + starSvg() + '</button>' : ''}
+        `;
+
+        // Insert after the session-row containing this chip
+        const sessionRow = chip.closest('.ag-session-row');
+        if (sessionRow) {
+          sessionRow.insertAdjacentElement('afterend', detail);
+        } else {
+          chip.parentElement.appendChild(detail);
+        }
+
+        chip.classList.add('is-expanded');
+        openChip = chip;
+        openDetail = detail;
+
+        // Wire up the fav button in detail
+        const favBtn = detail.querySelector('.ag-detail-fav');
+        if (favBtn) {
+          favBtn.addEventListener('click', ev => {
+            ev.stopPropagation();
+            toggleFavourite(it.symbol);
+            if (onChange) onChange();
+          });
+        }
+      });
+    });
+
+    // Close detail when clicking elsewhere
+    container.addEventListener('click', e => {
+      if (!e.target.closest('.ag-chip') && !e.target.closest('.ag-detail')) {
+        closeOpenDetail();
+      }
+    });
   }
 
   function starSvg() {

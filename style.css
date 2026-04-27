@@ -431,7 +431,169 @@ a { color: var(--blue-text); text-decoration: none; }
 }
 .card-sub { font-size: 11px; color: var(--text-3); font-weight: 500; }
 
-/* ─── Agenda items (grouped by date+session) ─── */
+/* ─── Agenda: grouped by day with inline ticker chips ─── */
+.ag-day {
+  padding: 16px 0 12px;
+  border-top: 0.5px solid var(--divider);
+}
+.ag-day:first-child { padding-top: 4px; border-top: 0; }
+
+.ag-day-head {
+  margin-bottom: 10px;
+}
+.ag-day-date {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-1);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  display: block;
+  line-height: 1.3;
+}
+.ag-day-rel {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-top: 4px;
+  background: var(--gray-bg);
+  color: var(--gray-text);
+}
+.ag-day-rel.is-today {
+  background: var(--green-bg);
+  color: var(--green-text);
+}
+.ag-day-rel.is-tomorrow {
+  background: var(--orange-bg);
+  color: var(--orange-text);
+}
+.ag-day-rel.is-soon {
+  background: var(--blue-bg);
+  color: var(--blue-text);
+}
+
+.ag-session-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: baseline;
+  padding: 5px 0;
+}
+.ag-session-time {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+}
+.ag-session-time .ag-session-tag {
+  display: inline-block;
+  font-size: 9px;
+  padding: 1px 5px;
+  background: var(--gray-bg);
+  color: var(--gray-text);
+  border-radius: 3px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  margin-left: 4px;
+  vertical-align: 1px;
+}
+.ag-tickers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  align-items: center;
+}
+.ag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  background: var(--input-bg);
+  color: var(--text-1);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  font-family: inherit;
+  letter-spacing: 0.005em;
+  transition: background 0.15s;
+}
+.ag-chip:hover { background: var(--gray-bg); }
+.ag-chip:active { background: var(--blue-bg); color: var(--blue-text); }
+.ag-chip.is-fav {
+  background: var(--yellow-bg);
+  color: #8a6800;
+}
+.ag-chip.is-fav::before {
+  content: '★';
+  font-size: 10px;
+  color: var(--yellow);
+}
+.ag-chip.is-major:not(.is-fav) {
+  background: var(--blue-bg);
+  color: var(--blue-text);
+}
+.ag-chip.is-expanded {
+  background: var(--blue-bg);
+  color: var(--blue-text);
+}
+@media (prefers-color-scheme: dark) {
+  .ag-chip.is-fav { color: var(--yellow); }
+}
+
+/* Expanded ticker info (shown when chip is tapped) */
+.ag-detail {
+  width: 100%;
+  margin: 6px 0 4px;
+  padding: 10px 12px;
+  background: var(--input-bg);
+  border-radius: 8px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+.ag-detail-info { min-width: 0; }
+.ag-detail-sym {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-1);
+}
+.ag-detail-name {
+  font-size: 12px;
+  color: var(--text-2);
+  margin-top: 2px;
+}
+.ag-detail-fav {
+  width: 30px; height: 30px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.ag-detail-fav svg {
+  width: 18px; height: 18px;
+  fill: none;
+  stroke: var(--text-3);
+  stroke-width: 1.7;
+  stroke-linejoin: round;
+}
+.ag-detail-fav.is-fav svg {
+  fill: var(--yellow);
+  stroke: var(--yellow);
+}
+
+/* Old ag-* classes kept for fallback (search results / watchlist) */
 .ag-group {
   padding: 14px 0;
   border-top: 0.5px solid var(--divider);
@@ -514,7 +676,6 @@ a { color: var(--blue-text); text-decoration: none; }
   max-width: 220px;
 }
 
-/* Old single-row agenda kept for backwards compatibility */
 .ag-item {
   display: grid;
   grid-template-columns: 1fr auto auto;
@@ -650,15 +811,18 @@ a { color: var(--blue-text); text-decoration: none; }
   .card { padding: 15px; border-radius: 14px; }
   .tl-card { padding: 13px; }
   .hero-clock { font-size: 38px; }
+  .ag-day { padding: 12px 0 8px; }
+  .ag-day-date { font-size: 12px; }
+  .ag-day-rel { font-size: 11px; }
+  .ag-session-time { font-size: 11px; }
+  .ag-chip { font-size: 11px; padding: 3px 7px; }
+  .ag-detail-sym { font-size: 13px; }
+  .ag-detail-name { font-size: 11px; }
   .ag-group { padding: 12px 0; }
   .ag-group-when { font-size: 12px; }
   .ag-group-when-rel { font-size: 11px; }
   .ag-company-sym { font-size: 13px; }
   .ag-company-name { font-size: 12px; max-width: 150px; }
-  .ag-item { gap: 10px; padding: 11px 0; }
-  .ag-sym { font-size: 14px; }
-  .ag-name { font-size: 12px; max-width: 140px; }
-  .ag-when { font-size: 11px; }
   .tl-axis-tick .num { font-size: 11px; }
   .search-input { font-size: 16px; }
 }
