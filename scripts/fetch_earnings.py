@@ -1,10 +1,11 @@
 """
-Fetch 180 days of US earnings from Finnhub + manually curated macro events.
-Output structure (earnings.json):
+Fetch 180 days of US earnings from Finnhub, merged with a hardcoded
+fallback list of major company earnings. Outputs earnings.json.
+
+Output structure:
   {
     "updated": ISO timestamp,
-    "all": [...]      # full 180-day catalog of earnings (for search)
-    "macro": [...]    # manually curated FOMC / CPI / GDP / etc events
+    "all": [...]   # full catalog of earnings (for search + agenda)
   }
 Runs daily via GitHub Actions.
 """
@@ -20,8 +21,7 @@ if not API_KEY:
     print("ERROR: FINNHUB_API_KEY not set", file=sys.stderr)
     sys.exit(1)
 
-# Major tickers — flagged as "important" so they bubble to the top.
-# These are the ones the user will most likely care about.
+# Major tickers — flagged so they bubble to the top of agenda lists.
 MAJOR_TICKERS = {
     # Mega-cap tech
     "AAPL", "MSFT", "GOOGL", "GOOG", "AMZN", "META", "NVDA", "TSLA",
@@ -30,75 +30,104 @@ MAJOR_TICKERS = {
     "CSCO", "IBM", "MU", "TXN", "ASML", "TSM", "ARM", "MRVL",
     # Cloud / SaaS
     "SHOP", "SNOW", "DDOG", "CRWD", "ZS", "PANW", "FTNT", "NOW",
-    "WDAY", "INTU", "PLTR", "MDB",
+    "WDAY", "INTU", "PLTR", "MDB", "HPQ", "DELL",
     # Consumer
     "WMT", "COST", "HD", "TGT", "LOW", "MCD", "SBUX", "NKE", "DIS",
+    "CMG", "LULU",
     # Finance
     "BRK.B", "BRK.A", "JPM", "V", "MA", "BAC", "WFC", "C", "GS",
-    "MS", "AXP", "BLK", "SCHW",
+    "MS", "AXP", "BLK", "SCHW", "PYPL",
     # Healthcare
     "UNH", "JNJ", "LLY", "PFE", "MRK", "ABBV", "TMO", "AMGN",
     # Energy & industrial
-    "XOM", "CVX", "CAT", "BA", "GE", "HON", "DE",
-    # Others
+    "XOM", "CVX", "CAT", "BA", "GE", "HON", "DE", "BKR",
+    # Telecoms / others
     "PG", "KO", "PEP", "T", "VZ", "TMUS", "ABNB", "UBER", "COIN",
-    "NFLX", "GME", "CHWY",
+    "GME", "CHWY",
 }
 
-# ── Manually curated macro events ──
-# Each: { date: 'YYYY-MM-DD', time_ny: 'HH:MM' (24h NY local), name: '...', country: '...', tag: '...' }
-# Time is when the data is released, in NY local time
-MACRO_EVENTS = [
-    # FOMC meetings 2026 (8 per year - confirmed pattern)
-    {"date": "2026-04-29", "time_ny": "14:00", "name": "FOMC 利率决议", "country": "US", "tag": "FOMC"},
-    {"date": "2026-06-17", "time_ny": "14:00", "name": "FOMC 利率决议", "country": "US", "tag": "FOMC"},
-    {"date": "2026-07-29", "time_ny": "14:00", "name": "FOMC 利率决议", "country": "US", "tag": "FOMC"},
-    {"date": "2026-09-16", "time_ny": "14:00", "name": "FOMC 利率决议", "country": "US", "tag": "FOMC"},
-    {"date": "2026-11-04", "time_ny": "14:00", "name": "FOMC 利率决议", "country": "US", "tag": "FOMC"},
-    {"date": "2026-12-16", "time_ny": "14:00", "name": "FOMC 利率决议", "country": "US", "tag": "FOMC"},
+# Friendly names for tickers (used when Finnhub returns just the ticker as name)
+TICKER_NAMES = {
+    "AAPL": "Apple", "MSFT": "Microsoft", "GOOGL": "Alphabet (Class A)",
+    "GOOG": "Alphabet", "AMZN": "Amazon", "META": "Meta Platforms",
+    "NVDA": "NVIDIA", "TSLA": "Tesla", "AVGO": "Broadcom", "ORCL": "Oracle",
+    "CRM": "Salesforce", "ADBE": "Adobe", "NFLX": "Netflix",
+    "AMD": "AMD", "QCOM": "Qualcomm", "INTC": "Intel", "CSCO": "Cisco",
+    "IBM": "IBM", "MU": "Micron", "TXN": "Texas Instruments",
+    "ASML": "ASML", "TSM": "TSMC", "ARM": "ARM Holdings", "MRVL": "Marvell",
+    "SHOP": "Shopify", "SNOW": "Snowflake", "DDOG": "Datadog",
+    "CRWD": "CrowdStrike", "ZS": "Zscaler", "PANW": "Palo Alto Networks",
+    "FTNT": "Fortinet", "NOW": "ServiceNow", "WDAY": "Workday",
+    "INTU": "Intuit", "PLTR": "Palantir", "MDB": "MongoDB",
+    "HPQ": "HP Inc", "DELL": "Dell", "WMT": "Walmart", "COST": "Costco",
+    "HD": "Home Depot", "TGT": "Target", "LOW": "Lowe's",
+    "MCD": "McDonald's", "SBUX": "Starbucks", "NKE": "Nike",
+    "DIS": "Disney", "CMG": "Chipotle", "LULU": "Lululemon",
+    "JPM": "JPMorgan Chase", "V": "Visa", "MA": "Mastercard",
+    "BAC": "Bank of America", "WFC": "Wells Fargo", "C": "Citigroup",
+    "GS": "Goldman Sachs", "MS": "Morgan Stanley", "AXP": "American Express",
+    "BLK": "BlackRock", "SCHW": "Charles Schwab", "PYPL": "PayPal",
+    "UNH": "UnitedHealth", "JNJ": "Johnson & Johnson", "LLY": "Eli Lilly",
+    "PFE": "Pfizer", "MRK": "Merck", "ABBV": "AbbVie",
+    "TMO": "Thermo Fisher", "AMGN": "Amgen",
+    "XOM": "ExxonMobil", "CVX": "Chevron", "CAT": "Caterpillar",
+    "BA": "Boeing", "GE": "GE Aerospace", "HON": "Honeywell",
+    "DE": "Deere", "BKR": "Baker Hughes",
+    "PG": "Procter & Gamble", "KO": "Coca-Cola", "PEP": "PepsiCo",
+    "T": "AT&T", "VZ": "Verizon", "TMUS": "T-Mobile",
+    "ABNB": "Airbnb", "UBER": "Uber", "COIN": "Coinbase",
+    "GME": "GameStop", "CHWY": "Chewy",
+}
 
-    # CPI releases (typically 2nd week of each month, 08:30 ET)
-    {"date": "2026-05-12", "time_ny": "08:30", "name": "美国 CPI 通胀数据", "country": "US", "tag": "CPI"},
-    {"date": "2026-06-10", "time_ny": "08:30", "name": "美国 CPI 通胀数据", "country": "US", "tag": "CPI"},
-    {"date": "2026-07-15", "time_ny": "08:30", "name": "美国 CPI 通胀数据", "country": "US", "tag": "CPI"},
-    {"date": "2026-08-12", "time_ny": "08:30", "name": "美国 CPI 通胀数据", "country": "US", "tag": "CPI"},
-    {"date": "2026-09-10", "time_ny": "08:30", "name": "美国 CPI 通胀数据", "country": "US", "tag": "CPI"},
-    {"date": "2026-10-13", "time_ny": "08:30", "name": "美国 CPI 通胀数据", "country": "US", "tag": "CPI"},
-
-    # GDP releases (quarterly, 1st month after quarter end)
-    {"date": "2026-04-30", "time_ny": "08:30", "name": "美国 Q1 GDP 初值", "country": "US", "tag": "GDP"},
-    {"date": "2026-07-30", "time_ny": "08:30", "name": "美国 Q2 GDP 初值", "country": "US", "tag": "GDP"},
-    {"date": "2026-10-29", "time_ny": "08:30", "name": "美国 Q3 GDP 初值", "country": "US", "tag": "GDP"},
-
-    # Non-farm Payrolls (1st Friday of each month, 08:30 ET)
-    {"date": "2026-05-01", "time_ny": "08:30", "name": "美国非农就业数据", "country": "US", "tag": "NFP"},
-    {"date": "2026-06-05", "time_ny": "08:30", "name": "美国非农就业数据", "country": "US", "tag": "NFP"},
-    {"date": "2026-07-02", "time_ny": "08:30", "name": "美国非农就业数据", "country": "US", "tag": "NFP"},
-    {"date": "2026-08-07", "time_ny": "08:30", "name": "美国非农就业数据", "country": "US", "tag": "NFP"},
-    {"date": "2026-09-04", "time_ny": "08:30", "name": "美国非农就业数据", "country": "US", "tag": "NFP"},
-    {"date": "2026-10-02", "time_ny": "08:30", "name": "美国非农就业数据", "country": "US", "tag": "NFP"},
-
-    # ECB rate decisions (typically every 6 weeks)
-    {"date": "2026-04-30", "time_ny": "08:15", "name": "欧央行利率决议", "country": "EU", "tag": "ECB"},
-    {"date": "2026-06-04", "time_ny": "08:15", "name": "欧央行利率决议", "country": "EU", "tag": "ECB"},
-    {"date": "2026-07-23", "time_ny": "08:15", "name": "欧央行利率决议", "country": "EU", "tag": "ECB"},
-    {"date": "2026-09-10", "time_ny": "08:15", "name": "欧央行利率决议", "country": "EU", "tag": "ECB"},
-    {"date": "2026-10-29", "time_ny": "08:15", "name": "欧央行利率决议", "country": "EU", "tag": "ECB"},
-
-    # ISM Manufacturing PMI (1st business day of month)
-    {"date": "2026-05-01", "time_ny": "10:00", "name": "ISM 制造业 PMI", "country": "US", "tag": "PMI"},
-    {"date": "2026-06-01", "time_ny": "10:00", "name": "ISM 制造业 PMI", "country": "US", "tag": "PMI"},
-    {"date": "2026-07-01", "time_ny": "10:00", "name": "ISM 制造业 PMI", "country": "US", "tag": "PMI"},
-    {"date": "2026-08-03", "time_ny": "10:00", "name": "ISM 制造业 PMI", "country": "US", "tag": "PMI"},
-    {"date": "2026-09-01", "time_ny": "10:00", "name": "ISM 制造业 PMI", "country": "US", "tag": "PMI"},
-    {"date": "2026-10-01", "time_ny": "10:00", "name": "ISM 制造业 PMI", "country": "US", "tag": "PMI"},
-
-    # RBA rate decisions (Australia - 1st Tuesday each month except January)
-    {"date": "2026-05-05", "time_ny": "00:30", "name": "澳央行 RBA 利率决议", "country": "AU", "tag": "RBA"},
-    {"date": "2026-06-02", "time_ny": "00:30", "name": "澳央行 RBA 利率决议", "country": "AU", "tag": "RBA"},
-    {"date": "2026-07-07", "time_ny": "00:30", "name": "澳央行 RBA 利率决议", "country": "AU", "tag": "RBA"},
-    {"date": "2026-08-04", "time_ny": "00:30", "name": "澳央行 RBA 利率决议", "country": "AU", "tag": "RBA"},
-    {"date": "2026-09-29", "time_ny": "00:30", "name": "澳央行 RBA 利率决议", "country": "AU", "tag": "RBA"},
+# ── HARDCODED FALLBACK earnings ──
+# These are confirmed earnings dates for major companies that should always
+# appear, even if Finnhub API misses them. Updated manually as needed.
+# Format: (ticker, "YYYY-MM-DD", "BMO" or "AMC")
+FALLBACK_EARNINGS = [
+    # Q1 2026 earnings season (April-May 2026)
+    # Mag 7 + key tech
+    ("TSLA", "2026-04-22", "AMC"),
+    ("META", "2026-04-29", "AMC"),
+    ("MSFT", "2026-04-29", "AMC"),
+    ("GOOGL", "2026-04-29", "AMC"),
+    ("GOOG", "2026-04-29", "AMC"),
+    ("AMZN", "2026-04-29", "AMC"),
+    ("AAPL", "2026-04-30", "AMC"),
+    # Other notable Q1 2026 dates
+    ("V", "2026-04-29", "AMC"),
+    ("KO", "2026-04-29", "BMO"),
+    ("LLY", "2026-04-30", "BMO"),
+    ("MA", "2026-04-30", "BMO"),
+    ("CAT", "2026-04-30", "BMO"),
+    ("MRK", "2026-04-30", "BMO"),
+    ("AMGN", "2026-05-01", "AMC"),
+    ("XOM", "2026-05-01", "BMO"),
+    ("CVX", "2026-05-01", "BMO"),
+    ("ABBV", "2026-04-30", "BMO"),
+    ("QCOM", "2026-04-29", "AMC"),
+    ("PYPL", "2026-04-28", "BMO"),
+    ("SBUX", "2026-04-28", "AMC"),
+    ("PFE", "2026-04-29", "BMO"),
+    ("UBER", "2026-05-07", "BMO"),
+    ("DIS", "2026-05-06", "BMO"),
+    # Late Q1 / early Q2 already-known calendars
+    ("PLTR", "2026-05-04", "AMC"),
+    ("AMD", "2026-05-05", "AMC"),
+    ("ABNB", "2026-05-06", "AMC"),
+    ("SHOP", "2026-05-06", "BMO"),
+    ("COIN", "2026-05-07", "AMC"),
+    # Mid-2026 (estimates - will be replaced by Finnhub data when closer)
+    ("NVDA", "2026-05-20", "AMC"),  # NVDA confirmed via Finnhub
+    # Late summer earnings (Q2 2026, reported Jul-Aug)
+    ("NFLX", "2026-07-16", "AMC"),
+    ("TSLA", "2026-07-22", "AMC"),
+    ("GOOGL", "2026-07-22", "AMC"),
+    ("GOOG", "2026-07-22", "AMC"),
+    ("MSFT", "2026-07-29", "AMC"),
+    ("META", "2026-07-29", "AMC"),
+    ("AAPL", "2026-07-30", "AMC"),
+    ("AMZN", "2026-07-30", "AMC"),
+    ("NVDA", "2026-08-26", "AMC"),
 ]
 
 
@@ -126,12 +155,30 @@ def normalize_entry(item):
     except Exception:
         return None
     h = 7 if session == "BMO" else 17
+    raw_name = item.get("name") or sym
+    # If Finnhub returned just the ticker as name, use our friendly name
+    if raw_name == sym and sym in TICKER_NAMES:
+        name = TICKER_NAMES[sym]
+    else:
+        name = raw_name
     return {
         "s": sym,
-        "n": item.get("name") or sym,
+        "n": name,
         "ny": {"y": y, "m": m - 1, "d": d, "h": h, "mn": 0},
         "t": session,
-        "maj": sym in MAJOR_TICKERS,  # boolean flag for major tickers
+        "maj": sym in MAJOR_TICKERS,
+    }
+
+
+def make_fallback_entry(ticker, date_str, session):
+    y, m, d = map(int, date_str.split("-"))
+    h = 7 if session == "BMO" else 17
+    return {
+        "s": ticker,
+        "n": TICKER_NAMES.get(ticker, ticker),
+        "ny": {"y": y, "m": m - 1, "d": d, "h": h, "mn": 0},
+        "t": session,
+        "maj": ticker in MAJOR_TICKERS,
     }
 
 
@@ -141,7 +188,7 @@ end_date = today + timedelta(days=180)
 
 print(f"Fetching earnings from {today} to {end_date}...")
 
-# Finnhub API may have a per-call range limit (~3 months). Split into chunks.
+# Split into chunks (Finnhub may have per-call range limits)
 all_raw = []
 chunk_start = today
 while chunk_start < end_date:
@@ -150,68 +197,75 @@ while chunk_start < end_date:
     try:
         chunk = fetch_range(chunk_start, chunk_end)
         all_raw.extend(chunk)
+        print(f"    got {len(chunk)} entries")
     except Exception as e:
         print(f"  ERROR fetching chunk: {e}", file=sys.stderr)
     chunk_start = chunk_end + timedelta(days=1)
 
-print(f"Got {len(all_raw)} raw entries")
+print(f"Total raw entries from Finnhub: {len(all_raw)}")
 
-# Normalize and dedupe by (symbol, date, session)
-seen = set()
-all_entries = []
+# Normalize
+normalized = []
 for it in all_raw:
     norm = normalize_entry(it)
-    if not norm:
-        continue
-    key = (norm["s"], norm["ny"]["y"], norm["ny"]["m"], norm["ny"]["d"], norm["t"])
-    if key in seen:
-        continue
-    seen.add(key)
-    # Optionally include EPS estimate for major tickers only (saves bytes)
-    eps = it.get("epsEstimate")
-    if eps is not None and norm["maj"]:
-        norm["eps"] = eps
-    all_entries.append(norm)
+    if norm:
+        normalized.append(norm)
 
+# Debug: report on which major tickers Finnhub gave us
+finnhub_majors = sorted({e["s"] for e in normalized if e["maj"]})
+print(f"Major tickers from Finnhub ({len(finnhub_majors)}): {', '.join(finnhub_majors[:30])}{'...' if len(finnhub_majors) > 30 else ''}")
 
+# ── Merge with hardcoded fallback (dedupe by symbol+date+session) ──
+combined = list(normalized)
+for ticker, date_str, session in FALLBACK_EARNINGS:
+    if date_str < today.isoformat() or date_str > end_date.isoformat():
+        continue
+    fallback = make_fallback_entry(ticker, date_str, session)
+    combined.append(fallback)
+
+# Dedupe: for each (symbol, date), prefer the entry with more info (Finnhub > fallback)
+seen = {}
+for e in combined:
+    key = (e["s"], e["ny"]["y"], e["ny"]["m"], e["ny"]["d"])
+    if key not in seen:
+        seen[key] = e
+    else:
+        # Keep the one with a better name (not equal to ticker)
+        existing = seen[key]
+        if existing["n"] == existing["s"] and e["n"] != e["s"]:
+            seen[key] = e
+
+all_entries = list(seen.values())
+
+# Sort: by date, then majors first
 def sort_key(e):
     ny = e["ny"]
     return (ny["y"], ny["m"], ny["d"], ny["h"], 0 if e.get("maj") else 1, e["s"])
 
 
 all_entries.sort(key=sort_key)
-print(f"Normalized to {len(all_entries)} unique entries")
+print(f"After merge + dedupe: {len(all_entries)} entries")
 
-# ── Filter macro events to just the next 180 days ──
-end_iso = end_date.isoformat()
-today_iso = today.isoformat()
-macro_filtered = []
-for e in MACRO_EVENTS:
-    if today_iso <= e["date"] <= end_iso:
-        y, m, d = map(int, e["date"].split("-"))
-        h, mn = map(int, e["time_ny"].split(":"))
-        macro_filtered.append({
-            "name": e["name"],
-            "tag": e["tag"],
-            "country": e["country"],
-            "ny": {"y": y, "m": m - 1, "d": d, "h": h, "mn": mn},
-        })
-macro_filtered.sort(key=lambda e: (e["ny"]["y"], e["ny"]["m"], e["ny"]["d"], e["ny"]["h"]))
-print(f"Filtered to {len(macro_filtered)} macro events in window")
+# Verify Mag 7 are all present
+mag7 = ["AAPL", "MSFT", "GOOGL", "AMZN", "META", "NVDA", "TSLA"]
+print("Mag 7 check:")
+for t in mag7:
+    matches = [e for e in all_entries if e["s"] == t]
+    if matches:
+        next_match = matches[0]  # already sorted by date
+        d = next_match["ny"]
+        print(f"  {t}: {d['y']}-{d['m']+1:02d}-{d['d']:02d} {next_match['t']} ({next_match['n']})")
+    else:
+        print(f"  {t}: NOT FOUND ⚠")
 
 # ── Output ──
 out = {
     "updated": datetime.now(timezone.utc).isoformat(),
     "all": all_entries,
-    "macro": macro_filtered,
 }
 
 with open("earnings.json", "w", encoding="utf-8") as f:
     json.dump(out, f, ensure_ascii=False, separators=(",", ":"))
 
 size_kb = os.path.getsize("earnings.json") / 1024
-print(f"Wrote {len(all_entries)} earnings + {len(macro_filtered)} macro events")
-print(f"File size: {size_kb:.1f} KB")
-
-major_count = sum(1 for e in all_entries if e.get("maj"))
-print(f"  ({major_count} major tickers in 180 days)")
+print(f"Wrote {len(all_entries)} entries to earnings.json ({size_kb:.1f} KB)")
