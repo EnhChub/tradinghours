@@ -12,31 +12,23 @@
 <body>
 <div class="wrap">
 
-  <nav class="nav">
-    <a href="index.html" class="nav-back">‹ 返回</a>
-    <div class="nav-links">
-      <a href="index.html">现在</a>
-      <a href="earnings.html">财报</a>
-      <a href="search.html" class="is-current">搜索</a>
-      <a href="about.html">说明</a>
-    </div>
+  <nav class="tabs">
+    <a href="index.html">现在</a>
+    <a href="search.html" class="is-current">搜索</a>
+    <a href="about.html">说明</a>
   </nav>
 
-  <h1 class="page-title">搜索</h1>
-  <p class="page-subtitle">输入股票代码或公司名,⭐ 收藏后会显示在首页</p>
-
-  <!-- Search box -->
   <div class="search-wrap">
     <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <circle cx="11" cy="11" r="7"/>
       <path d="m20 20-3.5-3.5"/>
     </svg>
-    <input type="text" id="search-input" class="search-input" placeholder="AAPL · Apple · NVDA..." autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" />
-    <button id="search-clear" class="search-clear" aria-label="Clear">✕</button>
+    <input type="text" id="search-input" class="search-input" placeholder="代码或公司名 · AAPL · NVDA · Apple..." autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" />
+    <button id="search-clear" class="search-clear" aria-label="清除">✕</button>
   </div>
 
   <!-- My favourites -->
-  <div class="card" id="fav-card">
+  <div class="card">
     <div class="card-head">
       <h3 class="card-title">⭐ 我的关注</h3>
       <span class="card-sub" id="fav-count">0 只</span>
@@ -53,19 +45,15 @@
     <div id="results-list"></div>
   </div>
 
-  <!-- Initial state when no search -->
+  <!-- Initial hint -->
   <div class="card" id="initial-card">
-    <div class="card-head">
-      <h3 class="card-title">提示</h3>
-      <span class="card-sub">未来 90 天</span>
-    </div>
-    <p style="font-size:14px;color:var(--text-2);line-height:1.6;margin:0;">
-      输入框里支持代码或公司名搜索。例如 <strong>AAPL</strong>、<strong>microsoft</strong>、<strong>NVDA</strong>。<br>
-      搜索结果中点 ⭐ 加入收藏。本设备保存,不需要账号。
+    <p style="font-size:13px;color:var(--text-2);line-height:1.6;margin:0;">
+      搜索未来 180 天内有财报的美股。点 ⭐ 加入收藏后会显示在首页。<br><br>
+      <span style="color:var(--text-3);font-size:12px;">注:数据涵盖 ~6 个月,某些公司下次财报超出窗口可能搜不到。</span>
     </p>
   </div>
 
-  <p class="foot">数据自动每天更新一次 · 财报时间已转换为悉尼时间</p>
+  <p class="foot">数据每天自动更新 · 收藏保存在本设备浏览器</p>
 
 </div>
 
@@ -82,8 +70,22 @@
   const favList = document.getElementById('fav-list');
   const favCount = document.getElementById('fav-count');
 
-  function starSvg(filled) {
-    return '<svg viewBox="0 0 24 24"><path d="M12 2.5l2.95 6.55 7.05.62-5.36 4.65 1.6 6.93L12 17.6l-6.24 3.65 1.6-6.93L2 9.67l7.05-.62z"/></svg>';
+  function buildItemsForSymbols(symbols) {
+    const now = new Date();
+    return symbols.map(sym => {
+      const next = M.nextEarningsFor(sym);
+      if (!next) return { kind: 'missing', symbol: sym };
+      return {
+        kind: 'earn',
+        sydDate: next.sydDate,
+        symbol: next.s,
+        name: next.n,
+        type: next.t,
+        major: !!next.maj,
+        favourite: M.isFavourite(next.s),
+        eps: next.eps,
+      };
+    });
   }
 
   function renderResults(query) {
@@ -100,120 +102,83 @@
     resultsCount.textContent = matches.length + ' 匹配';
 
     if (matches.length === 0) {
-      resultsList.innerHTML = '<div class="empty"><div class="icon">🔍</div>找不到匹配的公司<br><span style="font-size:12px;">未来 90 天的财报数据可能未涵盖这只股票</span></div>';
+      resultsList.innerHTML = '<div class="empty"><div class="empty-icon">🔍</div>找不到匹配的公司<br><span style="font-size:12px;color:var(--text-3);">未来 180 天内可能没有该公司的财报</span></div>';
       return;
     }
 
-    const now = new Date();
-    resultsList.innerHTML = '';
-    matches.forEach(e => {
-      // Get next earnings for this symbol (it's already e itself, but normalize)
-      const next = M.nextEarningsFor(e.s);
-      if (!next) return;
+    // Get unique symbols, then render via shared agenda renderer
+    const symbols = [...new Set(matches.map(e => e.s))];
+    const items = buildItemsForSymbols(symbols).filter(it => it.kind === 'earn');
 
-      const sydDate = next.sydDate;
-      const rel = M.relativeDay(sydDate, now);
-      const diffDays = Math.round((sydDate - now) / (24 * 3600 * 1000));
-      const isSoon = diffDays <= 2;
-
-      const isFav = M.isFavourite(e.s);
-      const tagText = next.t === 'BMO' ? '盘前' : '盘后';
-
-      const row = document.createElement('div');
-      row.className = 'result-row';
-      row.innerHTML = `
-        <div class="result-info">
-          <div>
-            <span class="result-sym">${e.s}</span>
-            <span class="result-name">${escapeHtml(e.n || '')}</span>
-          </div>
-          <div class="result-when">
-            ${M.fmtSydneyForAgenda(sydDate)}
-            <span class="result-when-tag">${tagText}</span>
-          </div>
-        </div>
-        <span class="result-rel ${isSoon ? 'is-soon' : ''}">${rel || ''}</span>
-        <button class="fav-btn ${isFav ? 'is-fav' : ''}" data-sym="${e.s}" aria-label="收藏">${starSvg(isFav)}</button>
-      `;
-      resultsList.appendChild(row);
-    });
-
-    // Wire up fav buttons
-    resultsList.querySelectorAll('.fav-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const sym = btn.getAttribute('data-sym');
-        const isNow = M.toggleFavourite(sym);
-        btn.classList.toggle('is-fav', isNow);
+    M.renderAgendaItems(items, resultsList, {
+      showFavBtn: true,
+      onChange: () => {
         renderFavourites();
-      });
+        renderResults(input.value);
+      }
     });
+
+    // Append "missing" symbols (no upcoming earnings) as plain rows if any
+    const missing = buildItemsForSymbols(symbols).filter(it => it.kind === 'missing');
+    if (missing.length > 0) {
+      const div = document.createElement('div');
+      div.className = 'empty';
+      div.style.fontSize = '12px';
+      div.style.padding = '10px 0 4px';
+      div.style.borderTop = '0.5px solid var(--divider)';
+      div.style.marginTop = '6px';
+      div.innerHTML = missing.map(m => m.symbol).join(', ') + '：未来 180 天内暂无财报';
+      resultsList.appendChild(div);
+    }
   }
 
   function renderFavourites() {
-    const now = new Date();
-    const favs = M.getFavouriteEarnings(now);
+    const favs = M.getFavourites();
     favCount.textContent = favs.length + ' 只';
 
     if (favs.length === 0) {
-      favList.innerHTML = '<div class="empty"><div class="icon">⭐</div>还没有关注的股票<br><span style="font-size:12px;">搜索后点击 ⭐ 加入</span></div>';
+      favList.innerHTML = '<div class="empty"><div class="empty-icon">⭐</div>还没有收藏的股票<br><span style="font-size:12px;color:var(--text-3);">搜索后点 ⭐ 加入</span></div>';
       return;
     }
 
-    favList.innerHTML = '';
-    favs.forEach(f => {
-      const row = document.createElement('div');
-      row.className = 'result-row';
+    const items = buildItemsForSymbols(favs);
+    const earned = items.filter(it => it.kind === 'earn');
+    const missing = items.filter(it => it.kind === 'missing');
 
-      if (f.missing) {
-        row.innerHTML = `
-          <div class="result-info">
-            <div><span class="result-sym">${f.symbol}</span></div>
-            <div class="result-when" style="color: var(--text-3);">未来 90 天内暂无财报数据</div>
-          </div>
-          <span class="result-rel"></span>
-          <button class="fav-btn is-fav" data-sym="${f.symbol}" aria-label="取消收藏">${starSvg(true)}</button>
-        `;
-      } else {
-        const rel = M.relativeDay(f.sydDate, now);
-        const diffDays = Math.round((f.sydDate - now) / (24 * 3600 * 1000));
-        const isSoon = diffDays <= 2;
-        const tagText = f.t === 'BMO' ? '盘前' : '盘后';
-        row.innerHTML = `
-          <div class="result-info">
-            <div>
-              <span class="result-sym">${f.symbol}</span>
-              <span class="result-name">${escapeHtml(f.n || '')}</span>
-            </div>
-            <div class="result-when">
-              ${M.fmtSydneyForAgenda(f.sydDate)}
-              <span class="result-when-tag">${tagText}</span>
-            </div>
-          </div>
-          <span class="result-rel ${isSoon ? 'is-soon' : ''}">${rel || ''}</span>
-          <button class="fav-btn is-fav" data-sym="${f.symbol}" aria-label="取消收藏">${starSvg(true)}</button>
-        `;
-      }
-      favList.appendChild(row);
-    });
-
-    favList.querySelectorAll('.fav-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const sym = btn.getAttribute('data-sym');
-        M.toggleFavourite(sym);
+    M.renderAgendaItems(earned, favList, {
+      showFavBtn: true,
+      onChange: () => {
         renderFavourites();
-        // Re-render results too in case this symbol is currently shown there
         if (input.value.trim()) renderResults(input.value);
-      });
+      }
     });
+
+    if (missing.length > 0) {
+      missing.forEach(m => {
+        const div = document.createElement('div');
+        div.className = 'ag-item';
+        div.innerHTML = `
+          <div class="ag-icon is-fav"><span class="ag-icon-text">⭐</span></div>
+          <div class="ag-info">
+            <div class="ag-title">${m.symbol}</div>
+            <div class="ag-meta" style="color:var(--text-3);">180 天内暂无财报</div>
+          </div>
+          <div class="ag-when"></div>
+          <button class="fav-btn is-fav" data-sym="${m.symbol}"><svg viewBox="0 0 24 24"><path d="M12 2.5l2.95 6.55 7.05.62-5.36 4.65 1.6 6.93L12 17.6l-6.24 3.65 1.6-6.93L2 9.67l7.05-.62z"/></svg></button>
+        `;
+        favList.appendChild(div);
+      });
+      favList.querySelectorAll('.fav-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          M.toggleFavourite(btn.getAttribute('data-sym'));
+          renderFavourites();
+          if (input.value.trim()) renderResults(input.value);
+        });
+      });
+    }
   }
 
-  function escapeHtml(s) {
-    return String(s).replace(/[&<>"']/g, c => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-    }[c]));
-  }
-
-  // Search input handlers
+  // Search input
   let searchTimer = null;
   input.addEventListener('input', () => {
     clearBtn.classList.toggle('is-visible', input.value.length > 0);
@@ -227,10 +192,7 @@
     input.focus();
   });
 
-  // Initial render
   renderFavourites();
-
-  // Re-render when earnings data finishes loading
   M.onEarningsUpdate(() => {
     renderFavourites();
     if (input.value.trim()) renderResults(input.value);

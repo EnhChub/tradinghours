@@ -12,57 +12,53 @@
 <body>
 <div class="wrap">
 
-  <nav class="nav">
-    <a href="index.html" class="nav-back">‹ 返回</a>
-    <div class="nav-links">
-      <a href="index.html">现在</a>
-      <a href="earnings.html">财报</a>
-      <a href="search.html">搜索</a>
-      <a href="about.html" class="is-current">说明</a>
-    </div>
+  <nav class="tabs">
+    <a href="index.html">现在</a>
+    <a href="search.html">搜索</a>
+    <a href="about.html" class="is-current">说明</a>
   </nav>
-
-  <h1 class="page-title">说明</h1>
 
   <div class="card">
     <div class="about-section">
       <h3>这是什么</h3>
-      <p>跟踪 ASX 和美股交易时段、本周重要财报的私人小工具。所有时间都已转换为悉尼当地时间,免去心算。</p>
+      <p>跟踪 ASX 和美股交易时段、本周及未来财报、宏观重要事件的私人小工具。所有时间已转换为悉尼当地时间。</p>
+    </div>
+
+    <div class="about-section">
+      <h3>"接下来 7 天"显示什么</h3>
+      <p>列出未来 7 天内的:</p>
+      <ul>
+        <li>⭐ 你收藏的股票财报</li>
+        <li>★ 主流公司(纳指/标普 100 等)财报</li>
+        <li>FOMC、CPI、GDP、非农、ECB、RBA 等宏观事件</li>
+      </ul>
+      <p style="margin-top:6px;">小盘股财报会被自动过滤掉,避免淹没。如需查看小公司,用搜索页。</p>
     </div>
 
     <div class="about-section">
       <h3>交易时段</h3>
       <ul>
-        <li><strong>ASX 集合竞价</strong>:7:00 – 10:00</li>
-        <li><strong>ASX 正常交易</strong>:10:00 – 16:00</li>
-        <li><strong>美股盘前</strong>:纽约 04:00 – 09:30</li>
-        <li><strong>美股正常交易</strong>:纽约 09:30 – 16:00</li>
-        <li><strong>美股盘后</strong>:纽约 16:00 – 20:00</li>
+        <li>ASX 集合竞价 7:00 – 10:00 / 正常 10:00 – 16:00</li>
+        <li>美股盘前 NY 04:00 – 09:30</li>
+        <li>美股正常 NY 09:30 – 16:00</li>
+        <li>美股盘后 NY 16:00 – 20:00</li>
       </ul>
     </div>
 
     <div class="about-section">
       <h3>财报时间换算</h3>
-      <p>"美股盘前"财报通常在纽约时间 07:00 发布,落到悉尼是当日傍晚。"美股盘后"财报通常在纽约时间 16:30 后陆续发布,业绩电话会议约 17:00 开始,落到悉尼是次日清晨 7-8 点。</p>
-      <p>页面显示的时间以业绩电话会的标准时间 (纽约 17:00) 为准。如果只关心财报数字本身,实际可以早 30-60 分钟看到。</p>
-    </div>
-
-    <div class="about-section">
-      <h3>搜索 / 收藏</h3>
-      <p>"搜索"页可以输入代码或公司名查任何美股的下次财报。点 ⭐ 加入收藏后,该股会显示在首页"我的关注"区域。</p>
-      <p>收藏列表保存在你当前设备的浏览器里 (localStorage)。换设备需要重新设置,清除浏览器数据会丢失。20-50 只完全够用。</p>
+      <p>"盘前"财报通常 NY 07:00 发布(悉尼当日傍晚)。"盘后"财报通常 NY 17:00(业绩电话会),悉尼次日清晨 7-8 点。</p>
     </div>
 
     <div class="about-section">
       <h3>数据来源</h3>
-      <p>市场时段:交易所官方营业时间。财报数据:Finnhub.io 财报日历 API,涵盖未来 90 天美股公司。每天悉尼时间清晨自动更新一次。</p>
-      <p>所有计算均在浏览器本地完成,不发送任何数据到第三方服务器。时区转换通过浏览器的 Intl API,自动跟随夏令时切换。</p>
+      <p>财报:Finnhub.io,涵盖未来 180 天美股公司,每天悉尼清晨自动更新。宏观事件:手动维护(FOMC、CPI 等政府/央行公开日历)。</p>
+      <p>所有计算在浏览器本地完成。收藏保存在浏览器 localStorage,不同设备不同步。</p>
     </div>
 
     <div class="about-section">
       <h3>关于精度</h3>
-      <p>本工具仅供参考,不构成投资建议。盘前盘后交易流动性低,价格波动剧烈。重要决策请以官方信息源为准。</p>
-      <p>偶尔会有数据偏差(比如盘前盘后分类错误),如发现请以公司投资者关系页面为准。</p>
+      <p>仅供参考,不构成投资建议。盘前盘后流动性低、波动剧烈。重要决策以官方信息为准。</p>
     </div>
   </div>
 

@@ -5,60 +5,48 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<title>Markets · 现在</title>
+<title>Markets</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23000'/%3E%3Cpath d='M20 65L40 45L55 60L80 30' stroke='%2330d158' stroke-width='8' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E" />
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 <div class="wrap">
 
-  <nav class="nav">
-    <span></span>
-    <div class="nav-links">
-      <a href="index.html" class="is-current">现在</a>
-      <a href="earnings.html">财报</a>
-      <a href="search.html">搜索</a>
-      <a href="about.html">说明</a>
-    </div>
+  <nav class="tabs">
+    <a href="index.html" class="is-current">现在</a>
+    <a href="search.html">搜索</a>
+    <a href="about.html">说明</a>
   </nav>
 
-  <h1 class="page-title">Markets</h1>
-
-  <div class="card">
-    <h2 class="hero-clock" id="clock">––:––:––</h2>
-    <div class="hero-date" id="date">––</div>
-
-    <div class="status-rows">
-      <div class="status-row">
-        <span class="status-dot" id="asx-dot"></span>
-        <span class="status-name">ASX</span>
-        <span class="status-detail" id="asx-detail">––</span>
+  <!-- Hero: clock + status combined -->
+  <div class="card hero">
+    <div class="hero-top">
+      <div>
+        <div class="hero-clock" id="clock">––:––:––</div>
+        <div class="hero-date" id="date">––</div>
       </div>
-      <div class="status-row">
-        <span class="status-dot" id="us-dot"></span>
-        <span class="status-name">US</span>
-        <span class="status-detail" id="us-detail">––</span>
+      <div class="hero-status">
+        <span class="status-pill is-off" id="asx-pill">
+          <span class="dot"></span>
+          <span>ASX <span id="asx-detail">––</span></span>
+        </span>
+        <span class="status-pill is-off" id="us-pill">
+          <span class="dot"></span>
+          <span>US <span id="us-detail">––</span></span>
+        </span>
       </div>
     </div>
-
-    <div class="next-block">
-      <p class="next-label">接下来 · UP NEXT</p>
-      <p class="next-event" id="next-event">––</p>
-      <p class="next-time"><span id="next-time">––</span> &nbsp;·&nbsp; <span class="next-countdown" id="next-countdown">––</span></p>
+    <div class="hero-next">
+      <span class="hero-next-label">接下来</span>
+      <span class="hero-next-text">
+        <span id="next-event">––</span>
+        <span class="countdown" id="next-countdown">––</span>
+      </span>
     </div>
   </div>
 
-  <!-- My favourites mini -->
-  <div class="card" id="fav-mini-card" style="display:none;">
-    <div class="card-head">
-      <h3 class="card-title">⭐ 我的关注</h3>
-      <span class="card-sub"><a href="search.html" style="color: var(--text-3);">管理 ›</a></span>
-    </div>
-    <div id="fav-mini-list"></div>
-  </div>
-
-  <!-- Timeline 12h -->
-  <div class="card">
+  <!-- Timeline -->
+  <div class="card tl-card">
     <div class="card-head">
       <h3 class="card-title">未来 12 小时</h3>
       <span class="card-sub">悉尼时间</span>
@@ -66,41 +54,26 @@
     <div class="tl-stage">
       <div class="tl-bar" id="tl-bar">
         <span class="tl-now"></span>
-        <span class="tl-now-label">NOW</span>
+        <span class="tl-now-label">现在</span>
       </div>
       <div class="tl-axis" id="tl-axis"></div>
     </div>
     <div class="tl-legend">
-      <span class="tl-legend-item"><span class="legend-swatch" style="background: var(--green-soft)"></span>ASX 交易</span>
+      <span class="tl-legend-item"><span class="legend-swatch" style="background: var(--green-soft)"></span>ASX</span>
       <span class="tl-legend-item"><span class="legend-swatch" style="background: var(--blue-soft)"></span>美股盘前</span>
-      <span class="tl-legend-item"><span class="legend-swatch" style="background: var(--blue)"></span>美股正常</span>
+      <span class="tl-legend-item"><span class="legend-swatch" style="background: var(--blue)"></span>美股开盘</span>
       <span class="tl-legend-item"><span class="legend-swatch" style="background: var(--indigo)"></span>美股盘后</span>
     </div>
   </div>
 
+  <!-- Unified 7-day agenda: favs + major earnings + macro events -->
   <div class="card">
     <div class="card-head">
-      <h3 class="card-title">即将发布的财报</h3>
-      <span class="card-sub">悉尼时间</span>
+      <h3 class="card-title">接下来 7 天</h3>
+      <span class="card-sub" id="agenda-sub">悉尼时间</span>
     </div>
-    <div id="agenda-preview"></div>
+    <div id="agenda-7"></div>
   </div>
-
-  <a href="earnings.html" class="card-link">
-    <div class="card-link-content">
-      <p class="card-link-title">查看本周完整财报日历</p>
-      <p class="card-link-desc">所有公司、宏观事件、按时间排序</p>
-    </div>
-    <span class="card-link-arrow">›</span>
-  </a>
-
-  <a href="search.html" class="card-link">
-    <div class="card-link-content">
-      <p class="card-link-title">🔍 搜索股票财报时间</p>
-      <p class="card-link-desc">收藏你常看的股票</p>
-    </div>
-    <span class="card-link-arrow">›</span>
-  </a>
 
   <p class="foot">所有时间均为悉尼当地时间 · 自动适配夏令时</p>
 
@@ -112,114 +85,86 @@
   const M = window.MarketsLib;
 
   let lastTimelineMinute = -1;
-  let lastAgendaHour = -1;
+  let lastAgendaMinute = -1;
 
-  function applyDot(el, state) {
-    el.classList.remove('is-on', 'is-soon');
-    if (state === 'open') el.classList.add('is-on');
-    else if (state === 'soon') el.classList.add('is-soon');
-  }
-
-  function fmtSydneyShort(date) {
-    const p = M.partsInTz(M.SYD, date);
-    return '周' + M.DAY_CN[p.dayIdx] + ' ' + p.day + ' ' + p.month + ' · ' + M.fmtClock24(p);
-  }
-
-  function renderFavMini() {
-    const now = new Date();
-    const favs = M.getFavouriteEarnings(now);
-    const card = document.getElementById('fav-mini-card');
-    const list = document.getElementById('fav-mini-list');
-
-    if (favs.length === 0) {
-      card.style.display = 'none';
-      return;
-    }
-    card.style.display = '';
-
-    // Show next 5 by date
-    const visible = favs.slice(0, 5);
-    list.innerHTML = '';
-    visible.forEach(f => {
-      const row = document.createElement('div');
-      row.className = 'fav-mini-row';
-      if (f.missing) {
-        row.innerHTML = `
-          <span class="fav-mini-sym">${f.symbol}</span>
-          <span class="fav-mini-when is-missing">90 天内无安排</span>
-        `;
-      } else {
-        const rel = M.relativeDay(f.sydDate, now);
-        const diffDays = Math.round((f.sydDate - now) / (24 * 3600 * 1000));
-        const tagText = f.t === 'BMO' ? '盘前' : '盘后';
-        row.innerHTML = `
-          <span class="fav-mini-sym">${f.symbol}</span>
-          <span class="fav-mini-when">
-            ${fmtSydneyShort(f.sydDate)} <span class="result-when-tag">${tagText}</span>
-            ${rel ? '<span class="fav-mini-rel">' + rel + '</span>' : ''}
-          </span>
-        `;
-      }
-      list.appendChild(row);
-    });
-    if (favs.length > 5) {
-      const more = document.createElement('div');
-      more.className = 'fav-mini-row';
-      more.innerHTML = `<span style="font-size:12px;color:var(--text-3);">还有 ${favs.length - 5} 只</span><span></span>`;
-      list.appendChild(more);
-    }
+  function applyPill(el, state) {
+    el.classList.remove('is-on', 'is-soon', 'is-off');
+    el.classList.add('is-' + state);
   }
 
   function update() {
     const now = new Date();
     const sydP = M.partsInTz(M.SYD, now);
 
+    // Clock
     document.getElementById('clock').textContent = M.fmtClockHMS(sydP);
     document.getElementById('date').textContent =
-      M.DAY_LONG_EN[sydP.dayIdx] + ', ' + sydP.day + ' ' + sydP.month + ' ' + sydP.year + '  ·  ' + sydP.timeZoneName;
+      M.DAY_LONG_EN[sydP.dayIdx] + ', ' + sydP.day + ' ' + sydP.month + ' ' + sydP.year + ' · ' + sydP.timeZoneName;
 
+    // Status pills
     const asxSt = M.asxStatusText(now);
     const usSt = M.usStatusText(now);
-    applyDot(document.getElementById('asx-dot'), asxSt.state);
-    applyDot(document.getElementById('us-dot'), usSt.state);
+    applyPill(document.getElementById('asx-pill'), asxSt.state);
+    applyPill(document.getElementById('us-pill'), usSt.state);
     document.getElementById('asx-detail').textContent = asxSt.text;
     document.getElementById('us-detail').textContent = usSt.text;
 
+    // Up next
     const nx = M.findNextEvent(now);
     if (nx) {
       document.getElementById('next-event').textContent = nx.label;
-      document.getElementById('next-time').textContent = fmtSydneyShort(nx.time);
       document.getElementById('next-countdown').textContent = M.fmtCountdown(nx.time - now);
     }
 
+    // Timeline (rebuild every minute)
     const minuteKey = Math.floor(now.getTime() / 60000);
     if (minuteKey !== lastTimelineMinute) {
       M.renderTimeline(now, document.getElementById('tl-bar'), document.getElementById('tl-axis'), 12);
       lastTimelineMinute = minuteKey;
     }
 
-    const hourKey = Math.floor(now.getTime() / 3600000);
-    if (hourKey !== lastAgendaHour) {
-      M.renderAgenda(now, document.getElementById('agenda-preview'), { limit: 2 });
-      lastAgendaHour = hourKey;
+    // Agenda (rebuild every 5 minutes is plenty)
+    const agendaKey = Math.floor(now.getTime() / (5 * 60000));
+    if (agendaKey !== lastAgendaMinute) {
+      renderAgenda();
+      lastAgendaMinute = agendaKey;
     }
 
-    let tabState = '';
-    if (asxSt.state === 'open' && usSt.state === 'open') tabState = 'ASX & US 开市';
-    else if (asxSt.state === 'open') tabState = 'ASX 开市';
-    else if (usSt.state === 'open') tabState = '美股开市';
-    else if (usSt.state === 'soon') tabState = usSt.text;
-    else if (asxSt.state === 'soon') tabState = asxSt.text;
-    else tabState = '休市';
-    document.title = tabState + ' · Markets';
+    // Tab title
+    let tab = '';
+    if (asxSt.state === 'on' && usSt.state === 'on') tab = 'ASX & US 开市';
+    else if (asxSt.state === 'on') tab = 'ASX 开市';
+    else if (usSt.state === 'on') tab = '美股开市';
+    else if (usSt.state === 'soon') tab = '美股 ' + usSt.text;
+    else if (asxSt.state === 'soon') tab = 'ASX ' + asxSt.text;
+    else tab = '休市';
+    document.title = tab + ' · Markets';
+  }
+
+  function renderAgenda() {
+    const now = new Date();
+    const items = M.buildAgenda(now, { days: 7, includeMinor: false });
+    const container = document.getElementById('agenda-7');
+    M.renderAgendaItems(items, container, {
+      limit: 12,
+      showFavBtn: true,
+      onChange: renderAgenda,
+      emptyMsg: '未来 7 天暂无重要事件'
+    });
+
+    // Update sub label
+    const favs = M.getFavourites();
+    const subEl = document.getElementById('agenda-sub');
+    if (favs.length > 0) {
+      subEl.textContent = '⭐ ' + favs.length + ' 只关注';
+    } else {
+      subEl.textContent = '主流公司 + 宏观';
+    }
   }
 
   update();
   setInterval(update, 1000);
-
-  // Render favs once data loads
-  M.onEarningsUpdate(renderFavMini);
-  renderFavMini();  // initial (will be empty until data loads)
+  M.onEarningsUpdate(renderAgenda);
 })();
 </script>
 </body>

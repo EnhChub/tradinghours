@@ -1,4 +1,4 @@
-// Shared market hours + earnings library
+// Shared market hours + agenda library
 (function (global) {
   const SYD = 'Australia/Sydney';
   const NY  = 'America/New_York';
@@ -44,6 +44,7 @@
     return new Date(guess);
   }
 
+  // ── Market state ──
   function asxOpenAt(t) {
     const p = partsInTz(SYD, t);
     if (p.dayIdx < 1 || p.dayIdx > 5) return false;
@@ -61,19 +62,19 @@
 
   function asxStatusText(t) {
     const p = partsInTz(SYD, t);
-    if (p.dayIdx === 0 || p.dayIdx === 6) return { text: '休市 · 周末', state: 'closed' };
-    if (asxOpenAt(t)) return { text: '正在交易', state: 'open' };
+    if (p.dayIdx === 0 || p.dayIdx === 6) return { text: '休市', state: 'off' };
+    if (asxOpenAt(t)) return { text: '正在交易', state: 'on' };
     if (p.minutes >= 420 && p.minutes < 600) return { text: '集合竞价', state: 'soon' };
-    return { text: '休市', state: 'closed' };
+    return { text: '休市', state: 'off' };
   }
   function usStatusText(t) {
     const sess = usSessionAt(t);
     const p = partsInTz(NY, t);
-    if (p.dayIdx === 0 || p.dayIdx === 6) return { text: '休市 · 周末', state: 'closed' };
-    if (sess === 'pre')  return { text: '盘前交易', state: 'soon' };
-    if (sess === 'reg')  return { text: '正常交易', state: 'open' };
-    if (sess === 'post') return { text: '盘后交易', state: 'soon' };
-    return { text: '休市', state: 'closed' };
+    if (p.dayIdx === 0 || p.dayIdx === 6) return { text: '休市', state: 'off' };
+    if (sess === 'pre')  return { text: '盘前', state: 'soon' };
+    if (sess === 'reg')  return { text: '正常交易', state: 'on' };
+    if (sess === 'post') return { text: '盘后', state: 'soon' };
+    return { text: '休市', state: 'off' };
   }
 
   function findNextEvent(now) {
@@ -88,9 +89,9 @@
         if (newAsx !== startAsx) {
           label = newAsx ? 'ASX 开盘' : 'ASX 收盘';
         } else if (newUs !== startUs) {
-          if (startUs === null && newUs === 'pre') label = '美股盘前开始';
-          else if (startUs === 'pre' && newUs === 'reg') label = '美股正式开盘';
-          else if (startUs === 'reg' && newUs === 'post') label = '美股收盘 · 盘后开始';
+          if (startUs === null && newUs === 'pre') label = '美股盘前';
+          else if (startUs === 'pre' && newUs === 'reg') label = '美股开盘';
+          else if (startUs === 'reg' && newUs === 'post') label = '美股收盘';
           else if (startUs === 'post' && newUs === null) label = '美股盘后结束';
           else label = '美股时段切换';
         }
@@ -100,6 +101,7 @@
     return null;
   }
 
+  // ── Timeline segments ──
   function buildSegments(now, hours) {
     const totalMin = hours * 60;
     const segs = [];
@@ -133,7 +135,7 @@
   };
 
   function renderTimeline(now, barEl, axisEl, hours) {
-    hours = hours || 24;
+    hours = hours || 12;
     const built = buildSegments(now, hours);
     const total = built.totalMin;
     barEl.querySelectorAll('.tl-seg').forEach(e => e.remove());
@@ -157,11 +159,12 @@
       const tick = document.createElement('div');
       tick.className = 'tl-axis-tick';
       if (i === 0 || i === ticks.length - 1) tick.classList.add('is-edge');
+      if (h === 0) tick.classList.add('is-now');
       tick.style.left = (h / hours * 100) + '%';
       const num = h === 0 ? '现在' : pad(p.hour) + ':00';
       let label = '';
       if (h === 0) label = pad(partsInTz(SYD, now).hour) + ':' + pad(partsInTz(SYD, now).minute);
-      else if (h === hours) label = hours + '小时后';
+      else if (h === hours) label = '+' + hours + 'h';
       else {
         const sydNow = partsInTz(SYD, now);
         const sydThen = partsInTz(SYD, t);
@@ -182,10 +185,9 @@
     });
   }
 
-  // ── Earnings data (loaded from earnings.json) ──
-  const FALLBACK_ITEMS = [];  // empty fallback; will show "loading" state if fetch fails
-  let curatedItems = FALLBACK_ITEMS;  // grouped weekly items for homepage
-  let allEntries = [];  // flat list for search/favourites
+  // ── Earnings + macro data ──
+  let allEarnings = [];   // flat list of all earnings (s, n, ny, t, maj, eps?)
+  let allMacro = [];       // flat list of macro events (name, tag, country, ny)
   let earningsUpdated = null;
   const listeners = [];
 
@@ -194,8 +196,8 @@
       .then(r => r.ok ? r.json() : Promise.reject('not found'))
       .then(data => {
         if (data) {
-          if (Array.isArray(data.items)) curatedItems = data.items;
-          if (Array.isArray(data.all)) allEntries = data.all;
+          if (Array.isArray(data.all)) allEarnings = data.all;
+          if (Array.isArray(data.macro)) allMacro = data.macro;
           earningsUpdated = data.updated || null;
           listeners.forEach(fn => { try { fn(); } catch(e){} });
         }
@@ -206,7 +208,7 @@
   }
   loadEarnings();
 
-  function fmtSydneyForAgenda(date) {
+  function fmtSydneyShort(date) {
     const p = partsInTz(SYD, date);
     return '周' + DAY_CN[p.dayIdx] + ' ' + p.day + ' ' + p.month + ' · ' + fmtClock24(p);
   }
@@ -227,37 +229,138 @@
     return null;
   }
 
-  function renderAgenda(now, container, opts) {
+  // ── Build unified agenda items (earnings + favourites + macro) ──
+  // Each item: { kind: 'earn'|'macro', sydDate, ...rest }
+  function buildAgenda(now, opts) {
+    opts = opts || {};
+    const days = opts.days || 7;
+    const includeMinor = !!opts.includeMinor;  // include non-major non-fav earnings
+    const cutoff = new Date(now.getTime() - 3 * 3600 * 1000);
+    const horizonEnd = new Date(now.getTime() + days * 24 * 3600 * 1000);
+    const favs = new Set(getFavourites());
+    const items = [];
+
+    allEarnings.forEach(e => {
+      const isFav = favs.has(e.s);
+      // Filter rule: include if major OR favourite OR (includeMinor=true)
+      if (!e.maj && !isFav && !includeMinor) return;
+      const d = nyWallToDate(e.ny.y, e.ny.m, e.ny.d, e.ny.h, e.ny.mn);
+      if (d < cutoff || d > horizonEnd) return;
+      items.push({
+        kind: 'earn',
+        sydDate: d,
+        symbol: e.s,
+        name: e.n,
+        type: e.t,
+        major: !!e.maj,
+        favourite: isFav,
+        eps: e.eps,
+      });
+    });
+
+    allMacro.forEach(m => {
+      const d = nyWallToDate(m.ny.y, m.ny.m, m.ny.d, m.ny.h, m.ny.mn);
+      if (d < cutoff || d > horizonEnd) return;
+      items.push({
+        kind: 'macro',
+        sydDate: d,
+        name: m.name,
+        tag: m.tag,
+        country: m.country,
+      });
+    });
+
+    items.sort((a, b) => a.sydDate - b.sydDate);
+    return items;
+  }
+
+  // ── Render unified agenda ──
+  function renderAgendaItems(items, container, opts) {
     opts = opts || {};
     const limit = opts.limit || null;
+    const showFavBtn = opts.showFavBtn !== false;
+    const onChange = opts.onChange;
+    const now = new Date();
+
     container.innerHTML = '';
-    let items = curatedItems
-      .map(e => Object.assign({}, e, { sydDate: nyWallToDate(e.ny.y, e.ny.m, e.ny.d, e.ny.h, e.ny.mn) }))
-      .filter(e => e.sydDate.getTime() > now.getTime() - 3 * 3600 * 1000)
-      .sort((a, b) => a.sydDate - b.sydDate);
-    if (limit) items = items.slice(0, limit);
-    if (items.length === 0) {
-      container.innerHTML = '<p class="agenda-cos" style="color: var(--text-2);">暂无即将发布的财报。</p>';
+    let visible = items;
+    if (limit) visible = visible.slice(0, limit);
+
+    if (visible.length === 0) {
+      const msg = opts.emptyMsg || '暂无即将到来的事件';
+      container.innerHTML = '<div class="empty"><div class="empty-icon">📅</div>' + msg + '</div>';
       return;
     }
-    items.forEach(e => {
+
+    visible.forEach(it => {
       const div = document.createElement('div');
-      div.className = 'agenda-item';
-      const tagClass = e.major ? 'agenda-tag is-major' : 'agenda-tag';
-      const tagText = e.type === 'BMO' ? '美股盘前' : '美股盘后';
-      const rel = relativeDay(e.sydDate, now);
-      const relSpan = rel ? ' <span class="agenda-time-rel">· ' + rel + '</span>' : '';
-      let html = '';
-      html += '<div class="agenda-when">';
-      html += '<span class="agenda-time">' + fmtSydneyForAgenda(e.sydDate) + relSpan + '</span>';
-      html += '<span class="' + tagClass + '">' + tagText + '</span>';
-      html += '</div>';
-      html += '<p class="agenda-cos' + (e.major ? ' is-major' : '') + '">' + e.cos.join(', ') + '</p>';
-      if (e.extra) html += '<p class="agenda-extra">+ ' + e.extra + '</p>';
-      if (e.event) html += '<p class="agenda-event">' + e.event + '</p>';
-      div.innerHTML = html;
+      div.className = 'ag-item';
+
+      const rel = relativeDay(it.sydDate, now);
+      const diffDays = Math.round((it.sydDate - now) / (24 * 3600 * 1000));
+      const diffHours = (it.sydDate - now) / (3600 * 1000);
+      let whenClass = '';
+      if (diffHours < 6) whenClass = 'is-imminent';
+      else if (diffDays <= 1) whenClass = 'is-soon';
+
+      const whenText = fmtSydneyShort(it.sydDate);
+      const relText = rel ? ('<div>' + rel + '</div>') : '';
+
+      let iconHTML, titleHTML, metaHTML, favBtnHTML = '';
+
+      if (it.kind === 'earn') {
+        const iconClass = it.favourite ? 'is-fav' : (it.major ? 'is-major' : 'is-minor');
+        iconHTML = '<div class="ag-icon ' + iconClass + '"><span class="ag-icon-text">' +
+                   (it.favourite ? '⭐' : (it.major ? '★' : '·')) + '</span></div>';
+        const nameSpan = (it.name && it.name !== it.symbol) ? '<span class="ag-title-name">' + escapeHtml(it.name) + '</span>' : '';
+        titleHTML = '<div class="ag-title">' + it.symbol + nameSpan + '</div>';
+        const tagText = it.type === 'BMO' ? '盘前' : '盘后';
+        const tagClass = it.major ? 'is-major' : '';
+        metaHTML = '<div class="ag-meta"><span class="ag-meta-tag ' + tagClass + '">' + tagText + '</span></div>';
+
+        if (showFavBtn) {
+          favBtnHTML = '<button class="fav-btn ' + (it.favourite ? 'is-fav' : '') + '" data-sym="' + it.symbol + '">' + starSvg() + '</button>';
+        }
+      } else {
+        // macro
+        iconHTML = '<div class="ag-icon is-macro"><span class="ag-icon-text">' + escapeHtml(it.tag) + '</span></div>';
+        titleHTML = '<div class="ag-title">' + escapeHtml(it.name) + '</div>';
+        metaHTML = '<div class="ag-meta"><span class="ag-meta-tag is-macro">' + escapeHtml(it.country) + '</span></div>';
+      }
+
+      div.innerHTML = `
+        ${iconHTML}
+        <div class="ag-info">
+          ${titleHTML}
+          ${metaHTML}
+        </div>
+        <div class="ag-when ${whenClass}">${whenText}${relText}</div>
+        ${favBtnHTML}
+      `;
       container.appendChild(div);
     });
+
+    // Wire fav buttons
+    if (showFavBtn) {
+      container.querySelectorAll('.fav-btn').forEach(btn => {
+        btn.addEventListener('click', e => {
+          e.stopPropagation();
+          const sym = btn.getAttribute('data-sym');
+          toggleFavourite(sym);
+          if (onChange) onChange();
+        });
+      });
+    }
+  }
+
+  function starSvg() {
+    return '<svg viewBox="0 0 24 24"><path d="M12 2.5l2.95 6.55 7.05.62-5.36 4.65 1.6 6.93L12 17.6l-6.24 3.65 1.6-6.93L2 9.67l7.05-.62z"/></svg>';
+  }
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
   }
 
   function onEarningsUpdate(fn) { listeners.push(fn); }
@@ -268,8 +371,8 @@
     const days = Math.floor(totalSec / 86400);
     const hours = Math.floor((totalSec % 86400) / 3600);
     const mins = Math.floor((totalSec % 3600) / 60);
-    if (days > 0) return days + ' 天 ' + hours + ' 小时后';
-    if (hours > 0) return hours + ' 小时 ' + pad(mins) + ' 分钟后';
+    if (days > 0) return days + 'd ' + hours + 'h 后';
+    if (hours > 0) return hours + 'h ' + pad(mins) + 'm 后';
     return mins + ' 分钟后';
   }
 
@@ -283,9 +386,8 @@
     } catch (e) { return []; }
   }
   function setFavourites(arr) {
-    try {
-      localStorage.setItem(FAV_KEY, JSON.stringify(arr));
-    } catch (e) { console.log('localStorage write failed:', e); }
+    try { localStorage.setItem(FAV_KEY, JSON.stringify(arr)); }
+    catch (e) {}
   }
   function isFavourite(symbol) {
     return getFavourites().includes(symbol.toUpperCase());
@@ -297,19 +399,18 @@
     if (idx >= 0) favs.splice(idx, 1);
     else favs.push(sym);
     setFavourites(favs);
-    return idx < 0;  // returns true if newly added
+    return idx < 0;
   }
 
-  // ── Search + lookup ──
+  // ── Search ──
   function searchEntries(query, opts) {
     opts = opts || {};
     const q = (query || '').trim().toUpperCase();
     if (!q) return [];
-    // Match symbol prefix first, then name contains
     const symMatch = [];
     const nameMatch = [];
-    const seen = new Set();  // dedupe by symbol — keep earliest date
-    allEntries.forEach(e => {
+    const seen = new Set();
+    allEarnings.forEach(e => {
       if (seen.has(e.s)) return;
       const symU = e.s;
       const nameU = (e.n || '').toUpperCase();
@@ -320,17 +421,15 @@
       }
     });
     const out = symMatch.concat(nameMatch);
-    const limit = opts.limit || 30;
-    return out.slice(0, limit);
+    return out.slice(0, opts.limit || 30);
   }
 
-  // Find next earnings entry for a specific symbol
   function nextEarningsFor(symbol) {
     const sym = symbol.toUpperCase();
     const now = Date.now();
     let best = null;
     let bestTs = Infinity;
-    allEntries.forEach(e => {
+    allEarnings.forEach(e => {
       if (e.s !== sym) return;
       const d = nyWallToDate(e.ny.y, e.ny.m, e.ny.d, e.ny.h, e.ny.mn);
       const ts = d.getTime();
@@ -342,26 +441,15 @@
     return best;
   }
 
-  function getFavouriteEarnings(now) {
-    const favs = getFavourites();
-    return favs.map(sym => {
-      const next = nextEarningsFor(sym);
-      return next ? Object.assign({ symbol: sym }, next) : { symbol: sym, missing: true };
-    }).sort((a, b) => {
-      if (a.missing && !b.missing) return 1;
-      if (!a.missing && b.missing) return -1;
-      if (a.missing && b.missing) return a.symbol.localeCompare(b.symbol);
-      return a.sydDate - b.sydDate;
-    });
-  }
-
   global.MarketsLib = {
     SYD, NY, DAY_NAMES, DAY_LONG_EN, DAY_CN,
-    pad, partsInTz, fmtClockHMS, fmtClock24, fmtSydneyForAgenda, relativeDay,
+    pad, partsInTz, fmtClockHMS, fmtClock24, fmtSydneyShort, relativeDay,
     asxStatusText, usStatusText, findNextEvent,
-    renderTimeline, renderAgenda, fmtCountdown,
+    renderTimeline,
+    buildAgenda, renderAgendaItems,
     onEarningsUpdate, getEarningsUpdatedAt: () => earningsUpdated,
     getFavourites, isFavourite, toggleFavourite,
-    searchEntries, nextEarningsFor, getFavouriteEarnings,
+    searchEntries, nextEarningsFor,
+    fmtCountdown,
   };
 })(window);
