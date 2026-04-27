@@ -1,19 +1,18 @@
-// Shared market hours + earnings data
+// Shared market hours + earnings library
 (function (global) {
   const SYD = 'Australia/Sydney';
   const NY  = 'America/New_York';
   const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const DAY_LONG_EN = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   const DAY_CN = ['日','一','二','三','四','五','六'];
+  const FAV_KEY = 'markets_fav_v1';
 
   function partsInTz(tz, date) {
     const fmt = new Intl.DateTimeFormat('en-GB', {
-      timeZone: tz,
-      weekday: 'short',
+      timeZone: tz, weekday: 'short',
       year: 'numeric', month: 'short', day: '2-digit',
       hour: '2-digit', minute: '2-digit', second: '2-digit',
-      hour12: false,
-      timeZoneName: 'short'
+      hour12: false, timeZoneName: 'short'
     });
     const out = {};
     fmt.formatToParts(date).forEach(p => out[p.type] = p.value);
@@ -106,7 +105,6 @@
     const segs = [];
     let cur = null;
     let curStart = 0;
-
     function classify(t) {
       const isAsx = asxOpenAt(t);
       const usSess = usSessionAt(t);
@@ -116,7 +114,6 @@
       if (usSess === 'post') return 'us-post';
       return null;
     }
-
     for (let m = 0; m <= totalMin; m++) {
       const t = new Date(now.getTime() + m * 60000);
       const c = classify(t);
@@ -131,17 +128,14 @@
   }
 
   const SEG_LABELS = {
-    'asx': 'ASX',
-    'us-pre': '美股盘前',
-    'us-reg': '美股开盘',
-    'us-post': '美股盘后'
+    'asx': 'ASX', 'us-pre': '美股盘前',
+    'us-reg': '美股开盘', 'us-post': '美股盘后'
   };
 
   function renderTimeline(now, barEl, axisEl, hours) {
     hours = hours || 24;
     const built = buildSegments(now, hours);
     const total = built.totalMin;
-
     barEl.querySelectorAll('.tl-seg').forEach(e => e.remove());
     built.segs.forEach(s => {
       if (!s.type) return;
@@ -155,7 +149,6 @@
       el.innerHTML = '<span class="tl-seg-label">' + SEG_LABELS[s.type] + '</span>';
       barEl.appendChild(el);
     });
-
     axisEl.innerHTML = '';
     const ticks = [0, hours / 4, hours / 2, hours * 3 / 4, hours];
     ticks.forEach((h, i) => {
@@ -165,7 +158,6 @@
       tick.className = 'tl-axis-tick';
       if (i === 0 || i === ticks.length - 1) tick.classList.add('is-edge');
       tick.style.left = (h / hours * 100) + '%';
-
       const num = h === 0 ? '现在' : pad(p.hour) + ':00';
       let label = '';
       if (h === 0) label = pad(partsInTz(SYD, now).hour) + ':' + pad(partsInTz(SYD, now).minute);
@@ -190,56 +182,26 @@
     });
   }
 
-  // ── Earnings: fetched from earnings.json (auto-updated daily) ──
-  // Fallback data used if fetch fails (e.g. first load, network issue, or earnings.json missing)
-  const FALLBACK_EARNINGS = [
-    {
-      ny: { y: 2026, m: 3, d: 28, h: 7, mn: 0 }, type: 'BMO',
-      major: true,
-      cos: ['Visa', 'Coca-Cola'],
-      extra: 'Spotify, Starbucks, UPS, Mondelez, T-Mobile, BP, Novartis'
-    },
-    {
-      ny: { y: 2026, m: 3, d: 29, h: 17, mn: 0 }, type: 'AMC',
-      major: true,
-      cos: ['Microsoft', 'Meta', 'Alphabet', 'Amazon'],
-      extra: 'Qualcomm, AbbVie',
-      event: 'FOMC 利率决议'
-    },
-    {
-      ny: { y: 2026, m: 3, d: 30, h: 17, mn: 0 }, type: 'AMC',
-      major: true,
-      cos: ['Apple', 'Eli Lilly'],
-      extra: 'Mastercard, Caterpillar, Merck, Amgen',
-      event: '美国 Q1 GDP 初值 · 欧央行利率决议'
-    },
-    {
-      ny: { y: 2026, m: 4, d: 1, h: 7, mn: 0 }, type: 'BMO',
-      major: false,
-      cos: ['ExxonMobil', 'Chevron'],
-      extra: 'Colgate-Palmolive',
-      event: 'ISM 制造业 PMI'
-    }
-  ];
-
-  let earningsData = FALLBACK_EARNINGS;
+  // ── Earnings data (loaded from earnings.json) ──
+  const FALLBACK_ITEMS = [];  // empty fallback; will show "loading" state if fetch fails
+  let curatedItems = FALLBACK_ITEMS;  // grouped weekly items for homepage
+  let allEntries = [];  // flat list for search/favourites
   let earningsUpdated = null;
-  const earningsListeners = [];
+  const listeners = [];
 
-  // Try to load fresh data from earnings.json (generated daily by GitHub Actions)
   function loadEarnings() {
-    fetch('earnings.json?t=' + Date.now(), { cache: 'no-store' })
+    return fetch('earnings.json?t=' + Date.now(), { cache: 'no-store' })
       .then(r => r.ok ? r.json() : Promise.reject('not found'))
       .then(data => {
-        if (data && Array.isArray(data.items) && data.items.length > 0) {
-          earningsData = data.items;
+        if (data) {
+          if (Array.isArray(data.items)) curatedItems = data.items;
+          if (Array.isArray(data.all)) allEntries = data.all;
           earningsUpdated = data.updated || null;
-          earningsListeners.forEach(fn => { try { fn(); } catch(e){} });
+          listeners.forEach(fn => { try { fn(); } catch(e){} });
         }
       })
       .catch(err => {
-        // Stay on fallback - this is fine
-        console.log('Using fallback earnings data:', err);
+        console.log('Could not load earnings.json:', err);
       });
   }
   loadEarnings();
@@ -254,13 +216,13 @@
     const pThen = partsInTz(SYD, date);
     const dayMs = 24 * 3600 * 1000;
     const sydDateKey = (p) => p.year + '-' + p.month + '-' + p.day;
-    const diffDays = Math.round((date.getTime() - now.getTime()) / dayMs);
     if (sydDateKey(pNow) === sydDateKey(pThen)) return '今天';
     const tomorrow = new Date(now.getTime() + dayMs);
     if (sydDateKey(partsInTz(SYD, tomorrow)) === sydDateKey(pThen)) return '明天';
     const dayAfter = new Date(now.getTime() + 2 * dayMs);
     if (sydDateKey(partsInTz(SYD, dayAfter)) === sydDateKey(pThen)) return '后天';
-    if (diffDays >= 0 && diffDays <= 6) return diffDays + ' 天后';
+    const diffDays = Math.round((date.getTime() - now.getTime()) / dayMs);
+    if (diffDays >= 0 && diffDays <= 30) return diffDays + ' 天后';
     if (diffDays < 0) return Math.abs(diffDays) + ' 天前';
     return null;
   }
@@ -269,27 +231,22 @@
     opts = opts || {};
     const limit = opts.limit || null;
     container.innerHTML = '';
-    let items = earningsData
+    let items = curatedItems
       .map(e => Object.assign({}, e, { sydDate: nyWallToDate(e.ny.y, e.ny.m, e.ny.d, e.ny.h, e.ny.mn) }))
       .filter(e => e.sydDate.getTime() > now.getTime() - 3 * 3600 * 1000)
       .sort((a, b) => a.sydDate - b.sydDate);
-
     if (limit) items = items.slice(0, limit);
-
     if (items.length === 0) {
-      container.innerHTML = '<p class="agenda-cos" style="color: var(--text-2);">本周暂无重要财报。</p>';
+      container.innerHTML = '<p class="agenda-cos" style="color: var(--text-2);">暂无即将发布的财报。</p>';
       return;
     }
-
     items.forEach(e => {
       const div = document.createElement('div');
       div.className = 'agenda-item';
       const tagClass = e.major ? 'agenda-tag is-major' : 'agenda-tag';
       const tagText = e.type === 'BMO' ? '美股盘前' : '美股盘后';
-
       const rel = relativeDay(e.sydDate, now);
       const relSpan = rel ? ' <span class="agenda-time-rel">· ' + rel + '</span>' : '';
-
       let html = '';
       html += '<div class="agenda-when">';
       html += '<span class="agenda-time">' + fmtSydneyForAgenda(e.sydDate) + relSpan + '</span>';
@@ -298,16 +255,12 @@
       html += '<p class="agenda-cos' + (e.major ? ' is-major' : '') + '">' + e.cos.join(', ') + '</p>';
       if (e.extra) html += '<p class="agenda-extra">+ ' + e.extra + '</p>';
       if (e.event) html += '<p class="agenda-event">' + e.event + '</p>';
-
       div.innerHTML = html;
       container.appendChild(div);
     });
   }
 
-  // Re-render any agenda containers when fresh data arrives
-  function onEarningsUpdate(fn) {
-    earningsListeners.push(fn);
-  }
+  function onEarningsUpdate(fn) { listeners.push(fn); }
 
   function fmtCountdown(ms) {
     if (ms < 0) return '现在';
@@ -320,12 +273,95 @@
     return mins + ' 分钟后';
   }
 
+  // ── Favourites (localStorage) ──
+  function getFavourites() {
+    try {
+      const raw = localStorage.getItem(FAV_KEY);
+      if (!raw) return [];
+      const arr = JSON.parse(raw);
+      return Array.isArray(arr) ? arr : [];
+    } catch (e) { return []; }
+  }
+  function setFavourites(arr) {
+    try {
+      localStorage.setItem(FAV_KEY, JSON.stringify(arr));
+    } catch (e) { console.log('localStorage write failed:', e); }
+  }
+  function isFavourite(symbol) {
+    return getFavourites().includes(symbol.toUpperCase());
+  }
+  function toggleFavourite(symbol) {
+    const sym = symbol.toUpperCase();
+    const favs = getFavourites();
+    const idx = favs.indexOf(sym);
+    if (idx >= 0) favs.splice(idx, 1);
+    else favs.push(sym);
+    setFavourites(favs);
+    return idx < 0;  // returns true if newly added
+  }
+
+  // ── Search + lookup ──
+  function searchEntries(query, opts) {
+    opts = opts || {};
+    const q = (query || '').trim().toUpperCase();
+    if (!q) return [];
+    // Match symbol prefix first, then name contains
+    const symMatch = [];
+    const nameMatch = [];
+    const seen = new Set();  // dedupe by symbol — keep earliest date
+    allEntries.forEach(e => {
+      if (seen.has(e.s)) return;
+      const symU = e.s;
+      const nameU = (e.n || '').toUpperCase();
+      if (symU.startsWith(q)) {
+        symMatch.push(e); seen.add(e.s);
+      } else if (nameU.includes(q)) {
+        nameMatch.push(e); seen.add(e.s);
+      }
+    });
+    const out = symMatch.concat(nameMatch);
+    const limit = opts.limit || 30;
+    return out.slice(0, limit);
+  }
+
+  // Find next earnings entry for a specific symbol
+  function nextEarningsFor(symbol) {
+    const sym = symbol.toUpperCase();
+    const now = Date.now();
+    let best = null;
+    let bestTs = Infinity;
+    allEntries.forEach(e => {
+      if (e.s !== sym) return;
+      const d = nyWallToDate(e.ny.y, e.ny.m, e.ny.d, e.ny.h, e.ny.mn);
+      const ts = d.getTime();
+      if (ts >= now - 3 * 3600 * 1000 && ts < bestTs) {
+        best = Object.assign({}, e, { sydDate: d });
+        bestTs = ts;
+      }
+    });
+    return best;
+  }
+
+  function getFavouriteEarnings(now) {
+    const favs = getFavourites();
+    return favs.map(sym => {
+      const next = nextEarningsFor(sym);
+      return next ? Object.assign({ symbol: sym }, next) : { symbol: sym, missing: true };
+    }).sort((a, b) => {
+      if (a.missing && !b.missing) return 1;
+      if (!a.missing && b.missing) return -1;
+      if (a.missing && b.missing) return a.symbol.localeCompare(b.symbol);
+      return a.sydDate - b.sydDate;
+    });
+  }
+
   global.MarketsLib = {
     SYD, NY, DAY_NAMES, DAY_LONG_EN, DAY_CN,
-    pad, partsInTz, fmtClockHMS, fmtClock24,
+    pad, partsInTz, fmtClockHMS, fmtClock24, fmtSydneyForAgenda, relativeDay,
     asxStatusText, usStatusText, findNextEvent,
     renderTimeline, renderAgenda, fmtCountdown,
-    onEarningsUpdate,
-    getEarningsUpdatedAt: () => earningsUpdated
+    onEarningsUpdate, getEarningsUpdatedAt: () => earningsUpdated,
+    getFavourites, isFavourite, toggleFavourite,
+    searchEntries, nextEarningsFor, getFavouriteEarnings,
   };
 })(window);

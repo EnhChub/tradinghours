@@ -17,6 +17,7 @@
     <div class="nav-links">
       <a href="index.html">现在</a>
       <a href="earnings.html" class="is-current">财报</a>
+      <a href="search.html">搜索</a>
       <a href="about.html">说明</a>
     </div>
   </nav>
@@ -24,7 +25,6 @@
   <h1 class="page-title">本周财报</h1>
   <p class="page-subtitle">所有时间已转换为悉尼时间 · 按发布顺序排列</p>
 
-  <!-- 24h timeline at top of earnings page -->
   <div class="card">
     <div class="card-head">
       <h3 class="card-title">未来 24 小时市场状态</h3>
@@ -45,16 +45,23 @@
     </div>
   </div>
 
-  <!-- Full agenda -->
   <div class="card">
     <div class="card-head">
-      <h3 class="card-title">完整日历 · Q1 2026</h3>
+      <h3 class="card-title">完整日历</h3>
       <span class="card-sub">悉尼时间</span>
     </div>
     <div id="agenda-full"></div>
   </div>
 
-  <p class="foot">"美股盘后"约为悉尼次日清晨 · "美股盘前"约为悉尼当日傍晚 · 时间已自动适配夏令时</p>
+  <a href="search.html" class="card-link">
+    <div class="card-link-content">
+      <p class="card-link-title">🔍 搜索其他股票</p>
+      <p class="card-link-desc">查看你关注的股票什么时候发财报</p>
+    </div>
+    <span class="card-link-arrow">›</span>
+  </a>
+
+  <p class="foot">"美股盘后"约为悉尼次日清晨 · "美股盘前"约为悉尼当日傍晚</p>
 
 </div>
 
@@ -67,13 +74,11 @@
 
   function update() {
     const now = new Date();
-
     const minuteKey = Math.floor(now.getTime() / 60000);
     if (minuteKey !== lastTimelineMinute) {
       M.renderTimeline(now, document.getElementById('tl-bar'), document.getElementById('tl-axis'), 24);
       lastTimelineMinute = minuteKey;
     }
-
     const hourKey = Math.floor(now.getTime() / 3600000);
     if (hourKey !== lastAgendaHour) {
       M.renderAgenda(now, document.getElementById('agenda-full'));
@@ -83,6 +88,7 @@
 
   update();
   setInterval(update, 30000);
+  M.onEarningsUpdate(() => M.renderAgenda(new Date(), document.getElementById('agenda-full')));
 })();
 </script>
 </body>

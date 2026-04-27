@@ -17,13 +17,13 @@
     <div class="nav-links">
       <a href="index.html" class="is-current">现在</a>
       <a href="earnings.html">财报</a>
+      <a href="search.html">搜索</a>
       <a href="about.html">说明</a>
     </div>
   </nav>
 
   <h1 class="page-title">Markets</h1>
 
-  <!-- Hero -->
   <div class="card">
     <h2 class="hero-clock" id="clock">––:––:––</h2>
     <div class="hero-date" id="date">––</div>
@@ -48,13 +48,21 @@
     </div>
   </div>
 
-  <!-- Timeline (12 hours for homepage) -->
+  <!-- My favourites mini -->
+  <div class="card" id="fav-mini-card" style="display:none;">
+    <div class="card-head">
+      <h3 class="card-title">⭐ 我的关注</h3>
+      <span class="card-sub"><a href="search.html" style="color: var(--text-3);">管理 ›</a></span>
+    </div>
+    <div id="fav-mini-list"></div>
+  </div>
+
+  <!-- Timeline 12h -->
   <div class="card">
     <div class="card-head">
       <h3 class="card-title">未来 12 小时</h3>
       <span class="card-sub">悉尼时间</span>
     </div>
-
     <div class="tl-stage">
       <div class="tl-bar" id="tl-bar">
         <span class="tl-now"></span>
@@ -62,7 +70,6 @@
       </div>
       <div class="tl-axis" id="tl-axis"></div>
     </div>
-
     <div class="tl-legend">
       <span class="tl-legend-item"><span class="legend-swatch" style="background: var(--green-soft)"></span>ASX 交易</span>
       <span class="tl-legend-item"><span class="legend-swatch" style="background: var(--blue-soft)"></span>美股盘前</span>
@@ -71,7 +78,6 @@
     </div>
   </div>
 
-  <!-- Earnings preview: just next 2 -->
   <div class="card">
     <div class="card-head">
       <h3 class="card-title">即将发布的财报</h3>
@@ -83,7 +89,15 @@
   <a href="earnings.html" class="card-link">
     <div class="card-link-content">
       <p class="card-link-title">查看本周完整财报日历</p>
-      <p class="card-link-desc">所有重要公司、宏观事件、按时间排序</p>
+      <p class="card-link-desc">所有公司、宏观事件、按时间排序</p>
+    </div>
+    <span class="card-link-arrow">›</span>
+  </a>
+
+  <a href="search.html" class="card-link">
+    <div class="card-link-content">
+      <p class="card-link-title">🔍 搜索股票财报时间</p>
+      <p class="card-link-desc">收藏你常看的股票</p>
     </div>
     <span class="card-link-arrow">›</span>
   </a>
@@ -109,6 +123,51 @@
   function fmtSydneyShort(date) {
     const p = M.partsInTz(M.SYD, date);
     return '周' + M.DAY_CN[p.dayIdx] + ' ' + p.day + ' ' + p.month + ' · ' + M.fmtClock24(p);
+  }
+
+  function renderFavMini() {
+    const now = new Date();
+    const favs = M.getFavouriteEarnings(now);
+    const card = document.getElementById('fav-mini-card');
+    const list = document.getElementById('fav-mini-list');
+
+    if (favs.length === 0) {
+      card.style.display = 'none';
+      return;
+    }
+    card.style.display = '';
+
+    // Show next 5 by date
+    const visible = favs.slice(0, 5);
+    list.innerHTML = '';
+    visible.forEach(f => {
+      const row = document.createElement('div');
+      row.className = 'fav-mini-row';
+      if (f.missing) {
+        row.innerHTML = `
+          <span class="fav-mini-sym">${f.symbol}</span>
+          <span class="fav-mini-when is-missing">90 天内无安排</span>
+        `;
+      } else {
+        const rel = M.relativeDay(f.sydDate, now);
+        const diffDays = Math.round((f.sydDate - now) / (24 * 3600 * 1000));
+        const tagText = f.t === 'BMO' ? '盘前' : '盘后';
+        row.innerHTML = `
+          <span class="fav-mini-sym">${f.symbol}</span>
+          <span class="fav-mini-when">
+            ${fmtSydneyShort(f.sydDate)} <span class="result-when-tag">${tagText}</span>
+            ${rel ? '<span class="fav-mini-rel">' + rel + '</span>' : ''}
+          </span>
+        `;
+      }
+      list.appendChild(row);
+    });
+    if (favs.length > 5) {
+      const more = document.createElement('div');
+      more.className = 'fav-mini-row';
+      more.innerHTML = `<span style="font-size:12px;color:var(--text-3);">还有 ${favs.length - 5} 只</span><span></span>`;
+      list.appendChild(more);
+    }
   }
 
   function update() {
@@ -157,6 +216,10 @@
 
   update();
   setInterval(update, 1000);
+
+  // Render favs once data loads
+  M.onEarningsUpdate(renderFavMini);
+  renderFavMini();  // initial (will be empty until data loads)
 })();
 </script>
 </body>
