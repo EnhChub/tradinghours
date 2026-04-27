@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
@@ -13,13 +13,26 @@
 <div class="wrap">
 
   <nav class="tabs">
-    <a href="index.html" class="is-current">现在</a>
-    <a href="search.html">搜索</a>
-    <a href="about.html">说明</a>
+    <a href="index.html" class="is-current">Now</a>
+    <a href="favourites.html">Watchlist</a>
+    <a href="about.html">About</a>
   </nav>
 
-  <!-- Hero: clock + status combined -->
-  <div class="card hero">
+  <!-- Search box -->
+  <div class="search-wrap">
+    <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="11" cy="11" r="7"/>
+      <path d="m20 20-3.5-3.5"/>
+    </svg>
+    <input type="text" id="search-input" class="search-input" placeholder="Search ticker or company (AAPL, apple, microsoft)" autocomplete="off" autocorrect="off" spellcheck="false" />
+    <button id="search-clear" class="search-clear" aria-label="Clear">✕</button>
+  </div>
+
+  <!-- Search results dropdown (hidden until typing) -->
+  <div class="search-results is-hidden" id="search-results"></div>
+
+  <!-- Hero: clock + status -->
+  <div class="card">
     <div class="hero-top">
       <div>
         <div class="hero-clock" id="clock">––:––:––</div>
@@ -37,7 +50,7 @@
       </div>
     </div>
     <div class="hero-next">
-      <span class="hero-next-label">接下来</span>
+      <span class="hero-next-label">Up Next</span>
       <span class="hero-next-text">
         <span id="next-event">––</span>
         <span class="countdown" id="next-countdown">––</span>
@@ -48,34 +61,34 @@
   <!-- Timeline -->
   <div class="card tl-card">
     <div class="card-head">
-      <h3 class="card-title">未来 12 小时</h3>
-      <span class="card-sub">悉尼时间</span>
+      <h3 class="card-title">Next 12 hours</h3>
+      <span class="card-sub">Sydney time</span>
     </div>
     <div class="tl-stage">
       <div class="tl-bar" id="tl-bar">
         <span class="tl-now"></span>
-        <span class="tl-now-label">现在</span>
+        <span class="tl-now-label">NOW</span>
       </div>
       <div class="tl-axis" id="tl-axis"></div>
     </div>
     <div class="tl-legend">
       <span class="tl-legend-item"><span class="legend-swatch" style="background: var(--green-soft)"></span>ASX</span>
-      <span class="tl-legend-item"><span class="legend-swatch" style="background: var(--blue-soft)"></span>美股盘前</span>
-      <span class="tl-legend-item"><span class="legend-swatch" style="background: var(--blue)"></span>美股开盘</span>
-      <span class="tl-legend-item"><span class="legend-swatch" style="background: var(--indigo)"></span>美股盘后</span>
+      <span class="tl-legend-item"><span class="legend-swatch" style="background: var(--blue-soft)"></span>US Pre</span>
+      <span class="tl-legend-item"><span class="legend-swatch" style="background: var(--blue)"></span>US Open</span>
+      <span class="tl-legend-item"><span class="legend-swatch" style="background: var(--indigo)"></span>US Post</span>
     </div>
   </div>
 
-  <!-- Unified 7-day agenda: favs + major earnings + macro events -->
+  <!-- Upcoming earnings -->
   <div class="card">
     <div class="card-head">
-      <h3 class="card-title">接下来 7 天</h3>
-      <span class="card-sub" id="agenda-sub">悉尼时间</span>
+      <h3 class="card-title" id="agenda-title">Upcoming Earnings</h3>
+      <span class="card-sub" id="agenda-sub">Sydney time</span>
     </div>
-    <div id="agenda-7"></div>
+    <div id="agenda"></div>
   </div>
 
-  <p class="foot">所有时间均为悉尼当地时间 · 自动适配夏令时</p>
+  <p class="foot">All times in Sydney local · Auto-adjusts for DST</p>
 
 </div>
 
@@ -96,12 +109,10 @@
     const now = new Date();
     const sydP = M.partsInTz(M.SYD, now);
 
-    // Clock
     document.getElementById('clock').textContent = M.fmtClockHMS(sydP);
     document.getElementById('date').textContent =
-      M.DAY_LONG_EN[sydP.dayIdx] + ', ' + sydP.day + ' ' + sydP.month + ' ' + sydP.year + ' · ' + sydP.timeZoneName;
+      M.DAY_LONG[sydP.dayIdx] + ', ' + sydP.day + ' ' + sydP.month + ' ' + sydP.year + ' · ' + sydP.timeZoneName;
 
-    // Status pills
     const asxSt = M.asxStatusText(now);
     const usSt = M.usStatusText(now);
     applyPill(document.getElementById('asx-pill'), asxSt.state);
@@ -109,62 +120,142 @@
     document.getElementById('asx-detail').textContent = asxSt.text;
     document.getElementById('us-detail').textContent = usSt.text;
 
-    // Up next
     const nx = M.findNextEvent(now);
     if (nx) {
       document.getElementById('next-event').textContent = nx.label;
       document.getElementById('next-countdown').textContent = M.fmtCountdown(nx.time - now);
     }
 
-    // Timeline (rebuild every minute)
     const minuteKey = Math.floor(now.getTime() / 60000);
     if (minuteKey !== lastTimelineMinute) {
       M.renderTimeline(now, document.getElementById('tl-bar'), document.getElementById('tl-axis'), 12);
       lastTimelineMinute = minuteKey;
     }
 
-    // Agenda (rebuild every 5 minutes is plenty)
     const agendaKey = Math.floor(now.getTime() / (5 * 60000));
     if (agendaKey !== lastAgendaMinute) {
       renderAgenda();
       lastAgendaMinute = agendaKey;
     }
 
-    // Tab title
     let tab = '';
-    if (asxSt.state === 'on' && usSt.state === 'on') tab = 'ASX & US 开市';
-    else if (asxSt.state === 'on') tab = 'ASX 开市';
-    else if (usSt.state === 'on') tab = '美股开市';
-    else if (usSt.state === 'soon') tab = '美股 ' + usSt.text;
+    if (asxSt.state === 'on' && usSt.state === 'on') tab = 'ASX & US Open';
+    else if (asxSt.state === 'on') tab = 'ASX Open';
+    else if (usSt.state === 'on') tab = 'US Open';
+    else if (usSt.state === 'soon') tab = 'US ' + usSt.text;
     else if (asxSt.state === 'soon') tab = 'ASX ' + asxSt.text;
-    else tab = '休市';
+    else tab = 'Closed';
     document.title = tab + ' · Markets';
   }
 
   function renderAgenda() {
     const now = new Date();
-    const items = M.buildAgenda(now, { days: 7, includeMinor: false });
-    const container = document.getElementById('agenda-7');
-    M.renderAgendaItems(items, container, {
-      limit: 12,
+    const result = M.buildAgenda(now, { minItems: 5, maxItems: 12 });
+    M.renderAgendaItems(result.items, document.getElementById('agenda'), {
       showFavBtn: true,
       onChange: renderAgenda,
-      emptyMsg: '未来 7 天暂无重要事件'
+      emptyMsg: 'No upcoming earnings'
     });
 
-    // Update sub label
-    const favs = M.getFavourites();
+    const titleEl = document.getElementById('agenda-title');
     const subEl = document.getElementById('agenda-sub');
-    if (favs.length > 0) {
-      subEl.textContent = '⭐ ' + favs.length + ' 只关注';
+
+    if (result.items.length === 0) {
+      titleEl.textContent = 'Upcoming Earnings';
+      subEl.textContent = '—';
+    } else if (result.days <= 7) {
+      titleEl.textContent = 'Next 7 days';
     } else {
-      subEl.textContent = '主流公司 + 宏观';
+      titleEl.textContent = 'Next ' + result.days + ' days';
+    }
+
+    const favs = M.getFavourites();
+    if (favs.length > 0) {
+      subEl.textContent = '★ ' + favs.length + ' watching';
+    } else {
+      subEl.textContent = 'Major companies';
     }
   }
 
+  // ── Search (live, on top of page) ──
+  const searchInput = document.getElementById('search-input');
+  const searchClear = document.getElementById('search-clear');
+  const searchResults = document.getElementById('search-results');
+  let searchTimer = null;
+
+  function renderSearchResults(query) {
+    const q = (query || '').trim();
+    if (!q) {
+      searchResults.classList.add('is-hidden');
+      return;
+    }
+
+    const matches = M.searchEntries(q, { limit: 20 });
+    searchResults.classList.remove('is-hidden');
+
+    if (matches.length === 0) {
+      searchResults.innerHTML = '<div class="search-empty">No matches found<br><span style="font-size:11px;">Not all companies are in the next 180 days</span></div>';
+      return;
+    }
+
+    // Convert search results to agenda items
+    const items = matches.map(e => ({
+      sydDate: M.partsInTz(M.SYD, new Date(0)) && (function(){
+        // Reconstruct sydDate from ny components
+        const d = new Date();
+        // Use library's nyWallToDate helper indirectly via nextEarningsFor
+        const next = M.nextEarningsFor(e.s);
+        return next ? next.sydDate : null;
+      })(),
+      symbol: e.s,
+      name: e.n,
+      type: e.t,
+      major: !!e.maj,
+      favourite: M.isFavourite(e.s),
+    })).filter(it => it.sydDate);
+
+    M.renderAgendaItems(items, searchResults, {
+      showFavBtn: true,
+      onChange: () => {
+        renderSearchResults(searchInput.value);
+        renderAgenda();
+      }
+    });
+  }
+
+  searchInput.addEventListener('input', () => {
+    searchClear.classList.toggle('is-visible', searchInput.value.length > 0);
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => renderSearchResults(searchInput.value), 100);
+  });
+  searchClear.addEventListener('click', () => {
+    searchInput.value = '';
+    searchClear.classList.remove('is-visible');
+    renderSearchResults('');
+    searchInput.focus();
+  });
+
+  // Hide search results when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!searchInput.contains(e.target) && !searchResults.contains(e.target) && !searchClear.contains(e.target)) {
+      // Don't hide; user might be reading. Only hide on Escape.
+    }
+  });
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      searchInput.value = '';
+      searchClear.classList.remove('is-visible');
+      renderSearchResults('');
+      searchInput.blur();
+    }
+  });
+
   update();
   setInterval(update, 1000);
-  M.onEarningsUpdate(renderAgenda);
+  M.onEarningsUpdate(() => {
+    renderAgenda();
+    if (searchInput.value.trim()) renderSearchResults(searchInput.value);
+  });
 })();
 </script>
 </body>

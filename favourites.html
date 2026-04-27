@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<title>Watchlist · Markets</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23000'/%3E%3Cpath d='M20 65L40 45L55 60L80 30' stroke='%2330d158' stroke-width='8' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="wrap">
+
+  <nav class="tabs">
+    <a href="index.html">Now</a>
+    <a href="favourites.html" class="is-current">Watchlist</a>
+    <a href="about.html">About</a>
+  </nav>
+
+  <!-- Search -->
+  <div class="search-wrap">
+    <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="11" cy="11" r="7"/>
+      <path d="m20 20-3.5-3.5"/>
+    </svg>
+    <input type="text" id="search-input" class="search-input" placeholder="Add ticker (AAPL, MSFT, NVDA)" autocomplete="off" autocorrect="off" spellcheck="false" />
+    <button id="search-clear" class="search-clear" aria-label="Clear">✕</button>
+  </div>
+
+  <div class="search-results is-hidden" id="search-results"></div>
+
+  <!-- Watchlist -->
+  <div class="card">
+    <div class="card-head">
+      <h3 class="card-title">★ My Watchlist</h3>
+      <span class="card-sub" id="fav-count">0 stocks</span>
+    </div>
+    <div id="fav-list"></div>
+  </div>
+
+  <p class="foot">Watchlist saved on this device · Search above to add</p>
+
+</div>
+
+<script src="markets.js"></script>
+<script>
+(function () {
+  const M = window.MarketsLib;
+  const searchInput = document.getElementById('search-input');
+  const searchClear = document.getElementById('search-clear');
+  const searchResults = document.getElementById('search-results');
+  const favList = document.getElementById('fav-list');
+  const favCount = document.getElementById('fav-count');
+
+  function renderFavourites() {
+    const favs = M.getFavourites();
+    favCount.textContent = favs.length + (favs.length === 1 ? ' stock' : ' stocks');
+
+    if (favs.length === 0) {
+      favList.innerHTML = '<div class="empty"><div class="empty-icon">★</div>No watchlist yet<br><span style="font-size:11px;">Search above and tap ★ to add</span></div>';
+      return;
+    }
+
+    const items = favs.map(sym => {
+      const next = M.nextEarningsFor(sym);
+      return next ? {
+        sydDate: next.sydDate,
+        symbol: next.s,
+        name: next.n,
+        type: next.t,
+        major: !!next.maj,
+        favourite: true,
+      } : null;
+    }).filter(Boolean);
+
+    items.sort((a, b) => a.sydDate - b.sydDate);
+
+    // Show items with earnings + missing items
+    const symsWithEarnings = new Set(items.map(it => it.symbol));
+    const missing = favs.filter(s => !symsWithEarnings.has(s));
+
+    M.renderAgendaItems(items, favList, {
+      showFavBtn: true,
+      onChange: () => {
+        renderFavourites();
+        if (searchInput.value.trim()) renderSearchResults(searchInput.value);
+      }
+    });
+
+    // Append missing
+    missing.forEach(sym => {
+      const div = document.createElement('div');
+      div.className = 'ag-item';
+      div.innerHTML = `
+        <div class="ag-info">
+          <div class="ag-row1">
+            <span class="ag-sym is-fav">${sym}</span>
+          </div>
+          <span class="ag-tag" style="background:transparent;color:var(--text-3);padding-left:0;">No upcoming earnings within 180 days</span>
+        </div>
+        <div class="ag-when"></div>
+        <button class="fav-btn is-fav" data-sym="${sym}"><svg viewBox="0 0 24 24"><path d="M12 2.5l2.95 6.55 7.05.62-5.36 4.65 1.6 6.93L12 17.6l-6.24 3.65 1.6-6.93L2 9.67l7.05-.62z"/></svg></button>
+      `;
+      favList.appendChild(div);
+    });
+
+    favList.querySelectorAll('.fav-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        M.toggleFavourite(btn.getAttribute('data-sym'));
+        renderFavourites();
+      });
+    });
+  }
+
+  function renderSearchResults(query) {
+    const q = (query || '').trim();
+    if (!q) {
+      searchResults.classList.add('is-hidden');
+      return;
+    }
+
+    const matches = M.searchEntries(q, { limit: 20 });
+    searchResults.classList.remove('is-hidden');
+
+    if (matches.length === 0) {
+      searchResults.innerHTML = '<div class="search-empty">No matches found</div>';
+      return;
+    }
+
+    const items = matches.map(e => {
+      const next = M.nextEarningsFor(e.s);
+      return next ? {
+        sydDate: next.sydDate,
+        symbol: next.s,
+        name: next.n,
+        type: next.t,
+        major: !!next.maj,
+        favourite: M.isFavourite(next.s),
+      } : null;
+    }).filter(Boolean);
+
+    M.renderAgendaItems(items, searchResults, {
+      showFavBtn: true,
+      onChange: () => {
+        renderSearchResults(searchInput.value);
+        renderFavourites();
+      }
+    });
+  }
+
+  let searchTimer = null;
+  searchInput.addEventListener('input', () => {
+    searchClear.classList.toggle('is-visible', searchInput.value.length > 0);
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => renderSearchResults(searchInput.value), 100);
+  });
+  searchClear.addEventListener('click', () => {
+    searchInput.value = '';
+    searchClear.classList.remove('is-visible');
+    renderSearchResults('');
+    searchInput.focus();
+  });
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      searchInput.value = '';
+      searchClear.classList.remove('is-visible');
+      renderSearchResults('');
+      searchInput.blur();
+    }
+  });
+
+  renderFavourites();
+  M.onEarningsUpdate(() => {
+    renderFavourites();
+    if (searchInput.value.trim()) renderSearchResults(searchInput.value);
+  });
+})();
+</script>
+</body>
+</html>

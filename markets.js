@@ -1,10 +1,10 @@
-// Shared market hours + agenda library
+// Shared market hours + agenda library (English UI)
 (function (global) {
   const SYD = 'Australia/Sydney';
   const NY  = 'America/New_York';
   const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  const DAY_LONG_EN = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-  const DAY_CN = ['日','一','二','三','四','五','六'];
+  const DAY_LONG = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const MONTH_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const FAV_KEY = 'markets_fav_v1';
 
   function partsInTz(tz, date) {
@@ -62,19 +62,19 @@
 
   function asxStatusText(t) {
     const p = partsInTz(SYD, t);
-    if (p.dayIdx === 0 || p.dayIdx === 6) return { text: '休市', state: 'off' };
-    if (asxOpenAt(t)) return { text: '正在交易', state: 'on' };
-    if (p.minutes >= 420 && p.minutes < 600) return { text: '集合竞价', state: 'soon' };
-    return { text: '休市', state: 'off' };
+    if (p.dayIdx === 0 || p.dayIdx === 6) return { text: 'Closed', state: 'off' };
+    if (asxOpenAt(t)) return { text: 'Open', state: 'on' };
+    if (p.minutes >= 420 && p.minutes < 600) return { text: 'Pre-open', state: 'soon' };
+    return { text: 'Closed', state: 'off' };
   }
   function usStatusText(t) {
     const sess = usSessionAt(t);
     const p = partsInTz(NY, t);
-    if (p.dayIdx === 0 || p.dayIdx === 6) return { text: '休市', state: 'off' };
-    if (sess === 'pre')  return { text: '盘前', state: 'soon' };
-    if (sess === 'reg')  return { text: '正常交易', state: 'on' };
-    if (sess === 'post') return { text: '盘后', state: 'soon' };
-    return { text: '休市', state: 'off' };
+    if (p.dayIdx === 0 || p.dayIdx === 6) return { text: 'Closed', state: 'off' };
+    if (sess === 'pre')  return { text: 'Pre-market', state: 'soon' };
+    if (sess === 'reg')  return { text: 'Open', state: 'on' };
+    if (sess === 'post') return { text: 'Post-market', state: 'soon' };
+    return { text: 'Closed', state: 'off' };
   }
 
   function findNextEvent(now) {
@@ -87,13 +87,13 @@
       if (newAsx !== startAsx || newUs !== startUs) {
         let label = '';
         if (newAsx !== startAsx) {
-          label = newAsx ? 'ASX 开盘' : 'ASX 收盘';
+          label = newAsx ? 'ASX opens' : 'ASX closes';
         } else if (newUs !== startUs) {
-          if (startUs === null && newUs === 'pre') label = '美股盘前';
-          else if (startUs === 'pre' && newUs === 'reg') label = '美股开盘';
-          else if (startUs === 'reg' && newUs === 'post') label = '美股收盘';
-          else if (startUs === 'post' && newUs === null) label = '美股盘后结束';
-          else label = '美股时段切换';
+          if (startUs === null && newUs === 'pre') label = 'US pre-market';
+          else if (startUs === 'pre' && newUs === 'reg') label = 'US opens';
+          else if (startUs === 'reg' && newUs === 'post') label = 'US closes';
+          else if (startUs === 'post' && newUs === null) label = 'US post-market ends';
+          else label = 'US session change';
         }
         return { time: t, label };
       }
@@ -101,7 +101,7 @@
     return null;
   }
 
-  // ── Timeline segments ──
+  // ── Timeline ──
   function buildSegments(now, hours) {
     const totalMin = hours * 60;
     const segs = [];
@@ -130,8 +130,8 @@
   }
 
   const SEG_LABELS = {
-    'asx': 'ASX', 'us-pre': '美股盘前',
-    'us-reg': '美股开盘', 'us-post': '美股盘后'
+    'asx': 'ASX', 'us-pre': 'Pre',
+    'us-reg': 'US Open', 'us-post': 'Post'
   };
 
   function renderTimeline(now, barEl, axisEl, hours) {
@@ -161,7 +161,7 @@
       if (i === 0 || i === ticks.length - 1) tick.classList.add('is-edge');
       if (h === 0) tick.classList.add('is-now');
       tick.style.left = (h / hours * 100) + '%';
-      const num = h === 0 ? '现在' : pad(p.hour) + ':00';
+      const num = h === 0 ? 'Now' : pad(p.hour) + ':00';
       let label = '';
       if (h === 0) label = pad(partsInTz(SYD, now).hour) + ':' + pad(partsInTz(SYD, now).minute);
       else if (h === hours) label = '+' + hours + 'h';
@@ -170,14 +170,14 @@
         const sydThen = partsInTz(SYD, t);
         const sameDay = sydNow.year === sydThen.year && sydNow.month === sydThen.month && sydNow.day === sydThen.day;
         if (sameDay) {
-          if (sydThen.hour < 12) label = '今早';
-          else if (sydThen.hour < 18) label = '今下午';
-          else label = '今晚';
+          if (sydThen.hour < 12) label = 'morning';
+          else if (sydThen.hour < 18) label = 'afternoon';
+          else label = 'tonight';
         } else {
-          if (sydThen.hour < 6) label = '凌晨';
-          else if (sydThen.hour < 12) label = '明早';
-          else if (sydThen.hour < 18) label = '明下午';
-          else label = '明晚';
+          if (sydThen.hour < 6) label = 'overnight';
+          else if (sydThen.hour < 12) label = 'tmrw AM';
+          else if (sydThen.hour < 18) label = 'tmrw PM';
+          else label = 'tmrw eve';
         }
       }
       tick.innerHTML = '<span class="num">' + num + '</span><span class="lbl">' + label + '</span>';
@@ -185,9 +185,8 @@
     });
   }
 
-  // ── Earnings + macro data ──
-  let allEarnings = [];   // flat list of all earnings (s, n, ny, t, maj, eps?)
-  let allMacro = [];       // flat list of macro events (name, tag, country, ny)
+  // ── Earnings data ──
+  let allEarnings = [];
   let earningsUpdated = null;
   const listeners = [];
 
@@ -195,9 +194,8 @@
     return fetch('earnings.json?t=' + Date.now(), { cache: 'no-store' })
       .then(r => r.ok ? r.json() : Promise.reject('not found'))
       .then(data => {
-        if (data) {
-          if (Array.isArray(data.all)) allEarnings = data.all;
-          if (Array.isArray(data.macro)) allMacro = data.macro;
+        if (data && Array.isArray(data.all)) {
+          allEarnings = data.all;
           earningsUpdated = data.updated || null;
           listeners.forEach(fn => { try { fn(); } catch(e){} });
         }
@@ -210,7 +208,7 @@
 
   function fmtSydneyShort(date) {
     const p = partsInTz(SYD, date);
-    return '周' + DAY_CN[p.dayIdx] + ' ' + p.day + ' ' + p.month + ' · ' + fmtClock24(p);
+    return DAY_NAMES[p.dayIdx] + ' ' + p.day + ' ' + p.month + ' · ' + fmtClock24(p);
   }
 
   function relativeDay(date, now) {
@@ -218,129 +216,115 @@
     const pThen = partsInTz(SYD, date);
     const dayMs = 24 * 3600 * 1000;
     const sydDateKey = (p) => p.year + '-' + p.month + '-' + p.day;
-    if (sydDateKey(pNow) === sydDateKey(pThen)) return '今天';
+    if (sydDateKey(pNow) === sydDateKey(pThen)) return 'today';
     const tomorrow = new Date(now.getTime() + dayMs);
-    if (sydDateKey(partsInTz(SYD, tomorrow)) === sydDateKey(pThen)) return '明天';
+    if (sydDateKey(partsInTz(SYD, tomorrow)) === sydDateKey(pThen)) return 'tomorrow';
     const dayAfter = new Date(now.getTime() + 2 * dayMs);
-    if (sydDateKey(partsInTz(SYD, dayAfter)) === sydDateKey(pThen)) return '后天';
+    if (sydDateKey(partsInTz(SYD, dayAfter)) === sydDateKey(pThen)) return 'in 2 days';
     const diffDays = Math.round((date.getTime() - now.getTime()) / dayMs);
-    if (diffDays >= 0 && diffDays <= 30) return diffDays + ' 天后';
-    if (diffDays < 0) return Math.abs(diffDays) + ' 天前';
+    if (diffDays >= 0 && diffDays <= 30) return 'in ' + diffDays + ' days';
+    if (diffDays < 0) return Math.abs(diffDays) + ' days ago';
     return null;
   }
 
-  // ── Build unified agenda items (earnings + favourites + macro) ──
-  // Each item: { kind: 'earn'|'macro', sydDate, ...rest }
+  // Build agenda items (only major + favourites, no macro events)
+  // Auto-expands window if not enough items found in 7 days
   function buildAgenda(now, opts) {
     opts = opts || {};
-    const days = opts.days || 7;
-    const includeMinor = !!opts.includeMinor;  // include non-major non-fav earnings
+    const minItems = opts.minItems || 5;
+    const maxItems = opts.maxItems || 12;
     const cutoff = new Date(now.getTime() - 3 * 3600 * 1000);
-    const horizonEnd = new Date(now.getTime() + days * 24 * 3600 * 1000);
     const favs = new Set(getFavourites());
-    const items = [];
 
-    allEarnings.forEach(e => {
-      const isFav = favs.has(e.s);
-      // Filter rule: include if major OR favourite OR (includeMinor=true)
-      if (!e.maj && !isFav && !includeMinor) return;
-      const d = nyWallToDate(e.ny.y, e.ny.m, e.ny.d, e.ny.h, e.ny.mn);
-      if (d < cutoff || d > horizonEnd) return;
-      items.push({
-        kind: 'earn',
-        sydDate: d,
-        symbol: e.s,
-        name: e.n,
-        type: e.t,
-        major: !!e.maj,
-        favourite: isFav,
-        eps: e.eps,
-      });
-    });
+    // Try expanding windows: 7 days, 14, 30, 60, 180
+    const windows = [7, 14, 30, 60, 180];
+    let items = [];
+    let usedDays = 7;
 
-    allMacro.forEach(m => {
-      const d = nyWallToDate(m.ny.y, m.ny.m, m.ny.d, m.ny.h, m.ny.mn);
-      if (d < cutoff || d > horizonEnd) return;
-      items.push({
-        kind: 'macro',
-        sydDate: d,
-        name: m.name,
-        tag: m.tag,
-        country: m.country,
+    for (const days of windows) {
+      const horizonEnd = new Date(now.getTime() + days * 24 * 3600 * 1000);
+      items = [];
+      const seenSym = new Set();
+      allEarnings.forEach(e => {
+        const isFav = favs.has(e.s);
+        if (!e.maj && !isFav) return;
+        const d = nyWallToDate(e.ny.y, e.ny.m, e.ny.d, e.ny.h, e.ny.mn);
+        if (d < cutoff || d > horizonEnd) return;
+        // Dedupe: keep only the earliest occurrence per symbol within window
+        if (seenSym.has(e.s)) return;
+        seenSym.add(e.s);
+        items.push({
+          sydDate: d,
+          symbol: e.s,
+          name: e.n,
+          type: e.t,
+          major: !!e.maj,
+          favourite: isFav,
+        });
       });
-    });
+      if (items.length >= minItems) {
+        usedDays = days;
+        break;
+      }
+      usedDays = days;
+    }
 
     items.sort((a, b) => a.sydDate - b.sydDate);
-    return items;
+    if (items.length > maxItems) items = items.slice(0, maxItems);
+    return { items, days: usedDays };
   }
 
-  // ── Render unified agenda ──
   function renderAgendaItems(items, container, opts) {
     opts = opts || {};
-    const limit = opts.limit || null;
     const showFavBtn = opts.showFavBtn !== false;
     const onChange = opts.onChange;
     const now = new Date();
 
     container.innerHTML = '';
-    let visible = items;
-    if (limit) visible = visible.slice(0, limit);
 
-    if (visible.length === 0) {
-      const msg = opts.emptyMsg || '暂无即将到来的事件';
+    if (items.length === 0) {
+      const msg = opts.emptyMsg || 'No upcoming earnings';
       container.innerHTML = '<div class="empty"><div class="empty-icon">📅</div>' + msg + '</div>';
       return;
     }
 
-    visible.forEach(it => {
+    items.forEach(it => {
       const div = document.createElement('div');
       div.className = 'ag-item';
 
       const rel = relativeDay(it.sydDate, now);
-      const diffDays = Math.round((it.sydDate - now) / (24 * 3600 * 1000));
       const diffHours = (it.sydDate - now) / (3600 * 1000);
       let whenClass = '';
-      if (diffHours < 6) whenClass = 'is-imminent';
-      else if (diffDays <= 1) whenClass = 'is-soon';
+      if (diffHours < 6 && diffHours > -1) whenClass = 'is-imminent';
+      else if (diffHours < 36) whenClass = 'is-soon';
 
-      const whenText = fmtSydneyShort(it.sydDate);
-      const relText = rel ? ('<div>' + rel + '</div>') : '';
+      const tagText = it.type === 'BMO' ? 'Pre-market' : 'After close';
+      const symClass = it.favourite ? 'is-fav' : '';
+      const nameSpan = (it.name && it.name !== it.symbol)
+        ? '<span class="ag-name">' + escapeHtml(it.name) + '</span>'
+        : '';
 
-      let iconHTML, titleHTML, metaHTML, favBtnHTML = '';
-
-      if (it.kind === 'earn') {
-        const iconClass = it.favourite ? 'is-fav' : (it.major ? 'is-major' : 'is-minor');
-        iconHTML = '<div class="ag-icon ' + iconClass + '"><span class="ag-icon-text">' +
-                   (it.favourite ? '⭐' : (it.major ? '★' : '·')) + '</span></div>';
-        const nameSpan = (it.name && it.name !== it.symbol) ? '<span class="ag-title-name">' + escapeHtml(it.name) + '</span>' : '';
-        titleHTML = '<div class="ag-title">' + it.symbol + nameSpan + '</div>';
-        const tagText = it.type === 'BMO' ? '盘前' : '盘后';
-        const tagClass = it.major ? 'is-major' : '';
-        metaHTML = '<div class="ag-meta"><span class="ag-meta-tag ' + tagClass + '">' + tagText + '</span></div>';
-
-        if (showFavBtn) {
-          favBtnHTML = '<button class="fav-btn ' + (it.favourite ? 'is-fav' : '') + '" data-sym="' + it.symbol + '">' + starSvg() + '</button>';
-        }
-      } else {
-        // macro
-        iconHTML = '<div class="ag-icon is-macro"><span class="ag-icon-text">' + escapeHtml(it.tag) + '</span></div>';
-        titleHTML = '<div class="ag-title">' + escapeHtml(it.name) + '</div>';
-        metaHTML = '<div class="ag-meta"><span class="ag-meta-tag is-macro">' + escapeHtml(it.country) + '</span></div>';
-      }
+      const favBtn = showFavBtn
+        ? '<button class="fav-btn ' + (it.favourite ? 'is-fav' : '') + '" data-sym="' + it.symbol + '">' + starSvg() + '</button>'
+        : '';
 
       div.innerHTML = `
-        ${iconHTML}
         <div class="ag-info">
-          ${titleHTML}
-          ${metaHTML}
+          <div class="ag-row1">
+            <span class="ag-sym ${symClass}">${it.symbol}</span>
+            ${nameSpan}
+          </div>
+          <span class="ag-tag">${tagText}</span>
         </div>
-        <div class="ag-when ${whenClass}">${whenText}${relText}</div>
-        ${favBtnHTML}
+        <div class="ag-when ${whenClass}">
+          ${fmtSydneyShort(it.sydDate)}
+          ${rel ? '<span class="ag-when-rel">' + rel + '</span>' : ''}
+        </div>
+        ${favBtn}
       `;
       container.appendChild(div);
     });
 
-    // Wire fav buttons
     if (showFavBtn) {
       container.querySelectorAll('.fav-btn').forEach(btn => {
         btn.addEventListener('click', e => {
@@ -366,17 +350,17 @@
   function onEarningsUpdate(fn) { listeners.push(fn); }
 
   function fmtCountdown(ms) {
-    if (ms < 0) return '现在';
+    if (ms < 0) return 'now';
     const totalSec = Math.floor(ms / 1000);
     const days = Math.floor(totalSec / 86400);
     const hours = Math.floor((totalSec % 86400) / 3600);
     const mins = Math.floor((totalSec % 3600) / 60);
-    if (days > 0) return days + 'd ' + hours + 'h 后';
-    if (hours > 0) return hours + 'h ' + pad(mins) + 'm 后';
-    return mins + ' 分钟后';
+    if (days > 0) return 'in ' + days + 'd ' + hours + 'h';
+    if (hours > 0) return 'in ' + hours + 'h ' + pad(mins) + 'm';
+    return 'in ' + mins + ' min';
   }
 
-  // ── Favourites (localStorage) ──
+  // ── Favourites ──
   function getFavourites() {
     try {
       const raw = localStorage.getItem(FAV_KEY);
@@ -402,26 +386,49 @@
     return idx < 0;
   }
 
-  // ── Search ──
+  // ── Search (case-insensitive on both ticker AND name) ──
   function searchEntries(query, opts) {
     opts = opts || {};
     const q = (query || '').trim().toUpperCase();
     if (!q) return [];
-    const symMatch = [];
-    const nameMatch = [];
-    const seen = new Set();
+
+    // Dedupe by symbol — keep earliest upcoming earnings for each ticker
+    const now = Date.now() - 3 * 3600 * 1000;
+    const bySym = new Map();
     allEarnings.forEach(e => {
-      if (seen.has(e.s)) return;
-      const symU = e.s;
-      const nameU = (e.n || '').toUpperCase();
-      if (symU.startsWith(q)) {
-        symMatch.push(e); seen.add(e.s);
-      } else if (nameU.includes(q)) {
-        nameMatch.push(e); seen.add(e.s);
+      const d = nyWallToDate(e.ny.y, e.ny.m, e.ny.d, e.ny.h, e.ny.mn).getTime();
+      if (d < now) return;
+      const existing = bySym.get(e.s);
+      if (!existing || d < existing._ts) {
+        bySym.set(e.s, Object.assign({}, e, { _ts: d }));
       }
     });
-    const out = symMatch.concat(nameMatch);
-    return out.slice(0, opts.limit || 30);
+
+    const symMatch = [];
+    const nameMatch = [];
+    bySym.forEach(e => {
+      const symU = e.s.toUpperCase();
+      const nameU = (e.n || '').toUpperCase();
+      // Prefix match on ticker
+      if (symU.startsWith(q)) {
+        symMatch.push(e);
+      }
+      // Substring match on name (only if not already a ticker match)
+      else if (nameU.includes(q)) {
+        nameMatch.push(e);
+      }
+    });
+
+    // Sort each group: majors first, then alphabetical
+    const sortFn = (a, b) => {
+      if (a.maj && !b.maj) return -1;
+      if (!a.maj && b.maj) return 1;
+      return a.s.localeCompare(b.s);
+    };
+    symMatch.sort(sortFn);
+    nameMatch.sort(sortFn);
+
+    return symMatch.concat(nameMatch).slice(0, opts.limit || 20);
   }
 
   function nextEarningsFor(symbol) {
@@ -442,7 +449,7 @@
   }
 
   global.MarketsLib = {
-    SYD, NY, DAY_NAMES, DAY_LONG_EN, DAY_CN,
+    SYD, NY, DAY_NAMES, DAY_LONG, MONTH_SHORT,
     pad, partsInTz, fmtClockHMS, fmtClock24, fmtSydneyShort, relativeDay,
     asxStatusText, usStatusText, findNextEvent,
     renderTimeline,

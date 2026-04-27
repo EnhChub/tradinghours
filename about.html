@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<title>说明 · Markets</title>
+<title>About · Markets</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23000'/%3E%3Cpath d='M20 65L40 45L55 60L80 30' stroke='%2330d158' stroke-width='8' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E" />
 <link rel="stylesheet" href="style.css" />
 </head>
@@ -13,56 +13,51 @@
 <div class="wrap">
 
   <nav class="tabs">
-    <a href="index.html">现在</a>
-    <a href="search.html">搜索</a>
-    <a href="about.html" class="is-current">说明</a>
+    <a href="index.html">Now</a>
+    <a href="favourites.html">Watchlist</a>
+    <a href="about.html" class="is-current">About</a>
   </nav>
 
   <div class="card">
     <div class="about-section">
-      <h3>这是什么</h3>
-      <p>跟踪 ASX 和美股交易时段、本周及未来财报、宏观重要事件的私人小工具。所有时间已转换为悉尼当地时间。</p>
+      <h3>What this is</h3>
+      <p>A personal tool to track ASX and US market hours, plus upcoming earnings for major companies. All times converted to Sydney local time.</p>
     </div>
 
     <div class="about-section">
-      <h3>"接下来 7 天"显示什么</h3>
-      <p>列出未来 7 天内的:</p>
-      <ul>
-        <li>⭐ 你收藏的股票财报</li>
-        <li>★ 主流公司(纳指/标普 100 等)财报</li>
-        <li>FOMC、CPI、GDP、非农、ECB、RBA 等宏观事件</li>
-      </ul>
-      <p style="margin-top:6px;">小盘股财报会被自动过滤掉,避免淹没。如需查看小公司,用搜索页。</p>
+      <h3>Upcoming Earnings</h3>
+      <p>The home page shows earnings from major companies (Mag 7, S&amp;P 100) plus your watchlist. Window auto-expands from 7 to 180 days until at least 5 items are found.</p>
+      <p>Search by ticker (AAPL) or company name (apple, microsoft) — case-insensitive.</p>
     </div>
 
     <div class="about-section">
-      <h3>交易时段</h3>
+      <h3>Market Hours</h3>
       <ul>
-        <li>ASX 集合竞价 7:00 – 10:00 / 正常 10:00 – 16:00</li>
-        <li>美股盘前 NY 04:00 – 09:30</li>
-        <li>美股正常 NY 09:30 – 16:00</li>
-        <li>美股盘后 NY 16:00 – 20:00</li>
+        <li>ASX Pre-open 7:00 – 10:00 / Open 10:00 – 16:00 AEST</li>
+        <li>US Pre-market NY 04:00 – 09:30</li>
+        <li>US Open NY 09:30 – 16:00</li>
+        <li>US Post-market NY 16:00 – 20:00</li>
       </ul>
     </div>
 
     <div class="about-section">
-      <h3>财报时间换算</h3>
-      <p>"盘前"财报通常 NY 07:00 发布(悉尼当日傍晚)。"盘后"财报通常 NY 17:00(业绩电话会),悉尼次日清晨 7-8 点。</p>
+      <h3>Earnings Time Conversion</h3>
+      <p>BMO (Pre-market) earnings typically released NY 07:00 → Sydney evening same day. AMC (After close) earnings typically NY 17:00 (earnings call) → Sydney 7-8 AM next day.</p>
     </div>
 
     <div class="about-section">
-      <h3>数据来源</h3>
-      <p>财报:Finnhub.io,涵盖未来 180 天美股公司,每天悉尼清晨自动更新。宏观事件:手动维护(FOMC、CPI 等政府/央行公开日历)。</p>
-      <p>所有计算在浏览器本地完成。收藏保存在浏览器 localStorage,不同设备不同步。</p>
+      <h3>Data Sources</h3>
+      <p>Earnings: Finnhub.io (180 days forward), updated daily via GitHub Actions. Major company calendars manually verified to ensure Mag 7 always appear.</p>
+      <p>All calculations run locally in your browser. Watchlist saved in localStorage — does not sync across devices.</p>
     </div>
 
     <div class="about-section">
-      <h3>关于精度</h3>
-      <p>仅供参考,不构成投资建议。盘前盘后流动性低、波动剧烈。重要决策以官方信息为准。</p>
+      <h3>Disclaimer</h3>
+      <p>For reference only, not investment advice. Pre-market and after-hours trading have low liquidity and high volatility. Verify important decisions against official sources.</p>
     </div>
   </div>
 
-  <p class="foot">私人工具 · 仅供参考</p>
+  <p class="foot">Personal tool · Reference only</p>
 
 </div>
 </body>
